@@ -144,6 +144,7 @@ def lex_string(source: str, start: int, loc: Loc) -> tuple[int, str]:
                 exit(1)
 
             next_ = source[pos + 1]
+            pos = pos + 2
 
             if next_ == "\\" or next_ == "\"":
                 string_content += next_
@@ -157,8 +158,6 @@ def lex_string(source: str, start: int, loc: Loc) -> tuple[int, str]:
             else:
                 print(f"{loc.shift(pos - start + 1)} Error: Unrecognised escape sequence.")
                 exit(1)
-
-            pos = pos + 2
 
         elif char == "\n":
             print(f"{loc} Error: Unterminated string.")
