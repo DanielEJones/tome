@@ -189,6 +189,7 @@ class InstrType(IntEnum):
     ADD = auto()
     SUB = auto()
     EQ = auto()
+    GT = auto()
     PRINT = auto()
     JMPF = auto()
     JMP = auto()
@@ -206,6 +207,7 @@ BUILTINS = {
     "+": Instr(InstrType.ADD),
     "-": Instr(InstrType.SUB),
     "=": Instr(InstrType.EQ),
+    ">": Instr(InstrType.GT),
     ".": Instr(InstrType.PRINT),
 }
 
@@ -300,8 +302,23 @@ def parse_expression(tokens: list[Token], start: int, len_so_far: int = 0) -> tu
 
         # WHILE ::= 'while' <exp> 'do' <exp> ';'
         elif token.typ is TokenType.KEY_WORD and token.lexeme == "while":
-            print(f"{token.loc} Error: 'while' statements are currently unsupported.")
-            exit(1)
+            loop_start = len(instrs) + len_so_far
+
+            pos = expect_keyword("while", tokens, pos)
+            pos, cond = parse_expression(tokens, pos, len_so_far)
+            instrs.extend(cond)
+
+            false_branch = len(instrs)
+            instrs.append(Instr(InstrType.JMPF, None))
+
+            pos = expect_keyword("do", tokens, pos)
+            pos, body = parse_expression(tokens, pos, len_so_far)
+            instrs.extend(body)
+
+            instrs.append(Instr(InstrType.JMP, loop_start))
+            instrs[false_branch].operand = len(instrs) + len_so_far
+
+            pos = expect_keyword(";", tokens, pos)
 
         # Numbers simply push their value onto the stack
         elif token.typ is TokenType.NUMBER:
@@ -330,4 +347,4 @@ def expect_keyword(lexeme: str, tokens: list[Token], index: int) -> int:
 
 
 if __name__ == "__main__":
-    main(["tome", "./examples/if_else.tome"])
+    main(argv)
