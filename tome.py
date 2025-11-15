@@ -85,6 +85,9 @@ def lex(source: str, file_name: str) -> list[Token]:
                 line_count = line_count + lines_passed
                 line_start = new_start
 
+        elif char == "-" and pos + 1 < len(source) and source[pos + 1] == "-":
+            pos = lex_comment(source, pos)
+
         # TODO: Maybe one day we will need punctuation >1 chars long
         elif char in PUNCTUATION_CHARACTERS:
             pos = pos + 1
@@ -118,6 +121,13 @@ def lex_spaces(source: str, start: int) -> tuple[int, int, int]:
             line_start = pos + 1
         pos = pos + 1
     return pos, lines_seen, line_start
+
+
+def lex_comment(source: str, start: int) -> int:
+    pos = start
+    while pos < len(source) and source[pos] != "\n":
+        pos = pos + 1
+    return pos
 
 
 def lex_number(source: str, start: int) -> tuple[int, str]:
