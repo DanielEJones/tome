@@ -1,0 +1,59 @@
+-- -- The following is a program listed out word-by-word and annotated
+-- -- with a diagram of the stack at each step to help you trace how
+-- -- values move around as words execute
+--
+--
+-- -- Push the number we wish to find the factorial of to the stack
+-- 6               -- [ 6 ]
+--
+-- -- If the number is greater than one, follow the algorithm
+-- if
+--     dup         -- [ 6 6 ]
+--     1           -- [ 6 6 1 ]
+--     >           -- [ 6 1 ]
+-- then            -- [ 6 ]
+-- -- Add a sentinel value to the bottom of the stack so that we
+-- -- will know when we have finished iterating
+--     0           -- [ 6 0 ]
+--     swap        -- [ 0 6 ]
+--
+-- -- Unlike a normal language, we don't need to declare an accumulator
+-- -- explicitly, we can instead push and use values on the stack
+--     while
+--         dup     -- [ 0 6 6 ]
+--         1       -- [ 0 6 6 1 ]
+--         >       -- [ 0 6 1 ]
+--     do          -- [ 0 6 ]
+--         dup     -- [ 0 6 6 ]
+--         1       -- [ 0 6 6 1 ]
+--         -       -- [ 0 6 5 ]
+--     ;           -- [ 0 6 5 4 3 2 ]
+--
+--     while
+--         2nd     -- [ 0 6 5 4 3 2 3 ]
+--     do          -- [ 0 6 5 4 3 2 ]
+--         *       -- [ 0 6 5 4 6 ]
+--     ;           -- [ 0 720 ]
+--
+--     swap        -- [ 720 0 ]
+--     drop        -- [ 720 ]
+--
+-- -- If the number is one or less, simply return one instead
+-- else
+--     1           -- [ 1 ]
+-- ;
+--
+-- -- Print to show off the correct answer
+-- .               -- [ ]
+
+
+6
+
+if dup 1 > then
+    0 swap
+    while dup 1 > do dup 1 - ;
+    while 2nd do *;
+    swap drop
+else 1;
+
+.

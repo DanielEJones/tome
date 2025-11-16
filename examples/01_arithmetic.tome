@@ -1,0 +1,20 @@
+-- -- The following is program listed out operation by operation and annotated
+-- -- with stack diagrams to aid in your understanding of program execution
+--
+-- -- This pushes a number to the stack
+-- 1           -- [ 1 ]
+--
+-- -- Operations are sequenced by concatenation
+-- 2 3         -- [ 1 2 3 ]
+--
+-- -- We perform computation using 'words', like the word for add
+-- +           -- [ 1 5 ]
+--
+-- -- Words take their arguments from the stack, and push their results
+-- -- back to the stack so they can be used by other words
+-- 2 - +       -- [ 4 ]
+--
+-- -- The dot consumes the top of the stack and prints it to the console
+-- .           -- [ ]
+
+1 2 3 + 2 - + .

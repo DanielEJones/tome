@@ -1,0 +1,42 @@
+-- If statements are likewise very similar to the ifs found in Python
+
+-- -- The following is a program listed out word-by-word and annotated
+-- -- with a diagram of the stack at each step to help you trace how
+-- -- values move around as words execute
+--
+-- -- We start by pushing a value onto the stack
+-- 6           -- [ 6 ]
+--
+-- -- Check the first condition
+-- if
+--     dup     -- [ 6 6 ]
+--     5       -- [ 6 6 5 ]
+--     <       -- [ 6 0 ]
+--
+-- -- If that is true, execute this block
+-- then        -- [ 6 ]
+--     108     -- skipped, because the top stack value
+--     .       -- was 0, which represents false
+--
+-- -- Else, check the second condition
+-- else-if
+--     dup     -- [ 6 6 ]
+--     5       -- [ 6 6 5 ]
+--     >       -- [ 6 1 ]
+--
+-- -- If that was tue, execute this block
+-- then        -- [ 6 ]
+--     104     -- [ 6 104 ]
+--     .       -- [ 6 ]
+--
+-- -- If neither succeeds, execute this
+-- else
+--     101     -- never called, because the else-if
+--     .       -- branch has already been taken
+-- ;
+
+6
+
+if      dup 5 < then 108 .
+else-if dup 5 > then 104 .
+                else 101 . ;

@@ -1,0 +1,28 @@
+-- Loops are mostly like loops are in normal programming languages,
+-- they have a condition that gets checked and a body that is evaluated.
+
+-- -- The following is a program listed out word-by-word and annotated
+-- -- with a diagram of the stack at each step to help you trace how
+-- -- values move around as words execute
+--
+-- -- Generally we will want some value on the stack to start a loop
+-- 1           -- [ 1 ]
+--
+-- while
+-- -- This block will be evaluated every cycle of the loop
+--     dup     -- [ 1 1 ]
+--     10      -- [ 1 1 10 ]
+--     <       -- [ 1 1 ]
+-- -- The top value of the stack at this point is consumed
+-- -- and checked for truthy-ness at the start of every loop
+-- -- iteration
+-- do          -- [ 1 ]
+--     dup     -- [ 1 1 ]
+--     .       -- [ 1 ]
+--     1       -- [ 1 1 ]
+--     +       -- [ 2 ]
+-- ;
+
+
+1 while dup 10 < do
+    dup . 1 + ;
