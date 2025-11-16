@@ -22,6 +22,10 @@ def do_compile(path: str) -> None:
     tokens = lex(source, path)
     instrs = parse(tokens)
 
+    print("--- BYTECODE ---")
+    dump_ir(instrs)
+
+    print("\n--- RESULT ---")
     interpret(instrs)
 
 
@@ -311,22 +315,30 @@ def parse_expression(tokens: list[Token], start: int) -> tuple[int, list[Instr]]
 
         # WHILE ::= 'while' <exp> 'do' <exp> ';'
         elif token.typ is TokenType.KEY_WORD and token.lexeme == "while":
+
+            # We need to be able to jump back to the condition, so make
+            # a label and remember it, so we can jump to it later
             loop_start = make_label()
             instrs.append(Instr(InstrType.LABEL, loop_start))
 
+            # Parse and emit the condition for the loop
             pos = expect_keyword("while", tokens, pos)
             pos, cond = parse_expression(tokens, pos)
             instrs.extend(cond)
 
+            # Emit a jump to the end if the condition is false
             false_branch = make_label()
             instrs.append(Instr(InstrType.JMPF, false_branch))
 
+            # Parse and emit the body of the loop
             pos = expect_keyword("do", tokens, pos)
             pos, body = parse_expression(tokens, pos)
             instrs.extend(body)
 
+            # Emit a jump back to the start of the loop
             instrs.append(Instr(InstrType.JMP, loop_start))
 
+            # Emit the label for the end of the loop
             pos = expect_keyword(";", tokens, pos)
             instrs.append(Instr(InstrType.LABEL, false_branch))
 
@@ -449,8 +461,15 @@ def interpret(instructions: list[Instr]) -> None:
 #
 
 def dump_ir(instructions: list[Instr]) -> None:
-    print("__[ IP ]____MNEM____OP__")
+    print("start:")
     for i, instr in enumerate(instructions):
+        if instr.opcode is InstrType.LABEL:
+            # If we aren't in a block of labels, print a newline for separation
+            if i != 0 and instructions[i - 1].opcode is not InstrType.LABEL:
+                print()
+            print(f"{instr.operand}:")
+            continue
+
         print(f"  [{i:04}]    {instr.opcode.name:8}{instr.operand if instr.operand is not None else ''}")
 
 
