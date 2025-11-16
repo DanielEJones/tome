@@ -22,9 +22,7 @@ def do_compile(path: str) -> None:
     tokens = lex(source, path)
     instrs = parse(tokens)
 
-    print("_[ IP ]____MNEM____OP_")
-    for i, instr in enumerate(instrs):
-        print(f" [{i:04}]    {instr.opcode.name:8}{instr.operand if instr.operand is not None else ''}")
+    interpret(instrs)
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -38,6 +36,7 @@ class TokenType(IntEnum):
     WORD = auto()
     PUNC = auto()
     EOF = auto()
+    COUNT = auto()
 
 
 @dataclass
@@ -204,6 +203,7 @@ class InstrType(IntEnum):
     JMPF = auto()
     JMP = auto()
     END = auto()
+    COUNT = auto()
 
 
 @dataclass
@@ -236,6 +236,8 @@ def parse(tokens: list[Token]) -> list[Instr]:
 
 def parse_expression(tokens: list[Token], start: int, len_so_far: int = 0) -> tuple[int, list[Instr]]:
     pos, instrs = start, []
+
+    assert TokenType.COUNT == 7, "Make sure all token types are handled as necessary."
 
     while pos < len(tokens):
         token = tokens[pos]
@@ -355,6 +357,84 @@ def expect_keyword(lexeme: str, tokens: list[Token], index: int) -> int:
 
     return index + 1
 
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Interpreter Implementation
+#
+
+def interpret(instructions: list[Instr]) -> None:
+    ip, stack = 0, []
+
+    assert InstrType.COUNT == 11, "Make sure all instructions are handled as necessary."
+
+    while ip < len(instructions):
+        instr = instructions[ip]
+        ip = ip + 1
+
+        if instr.opcode is InstrType.PUSH:
+            stack.append(instr.operand)
+
+        elif instr.opcode is InstrType.ADD:
+            right = stack.pop()
+            left = stack.pop()
+            stack.append(left + right)
+
+        elif instr.opcode is InstrType.SUB:
+            right = stack.pop()
+            left = stack.pop()
+            stack.append(left - right)
+
+        elif instr.opcode is InstrType.EQ:
+            right = stack.pop()
+            left = stack.pop()
+            stack.append(int(left == right))
+
+        elif instr.opcode is InstrType.GT:
+            right = stack.pop()
+            left = stack.pop()
+            stack.append(int(left > right))
+
+        elif instr.opcode is InstrType.DUP:
+            top = stack.pop()
+            stack.append(top)
+            stack.append(top)
+
+        elif instr.opcode is InstrType.JMPF:
+            top = stack.pop()
+            if top == 0:
+                ip = instr.operand
+
+        elif instr.opcode is InstrType.JMP:
+            ip = instr.operand
+
+        elif instr.opcode is InstrType.PRINT:
+            top = stack.pop()
+            print(top)
+
+        elif instr.opcode is InstrType.END:
+            return
+
+        else:
+            print(f"Error: unhandled opcode {instr.opcode.name}")
+            exit(1)
+
+    print(f"Error: The instructions provided never called END. This should not happen.")
+    exit(1)
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Debug Helpers
+#
+
+def dump_ir(instructions: list[Instr]) -> None:
+    print("_[ IP ]____MNEM____OP_")
+    for i, instr in enumerate(instructions):
+        print(f" [{i:04}]    {instr.opcode.name:8}{instr.operand if instr.operand is not None else ''}")
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Entry Point
+#
 
 if __name__ == "__main__":
     main(argv)
