@@ -97,7 +97,15 @@ def lex(source: str, file_name: str) -> list[Token]:
 
         elif char.isdigit():
             pos, lexeme = lex_number(source, pos)
-            tokens.append(Token(TokenType.NUMBER, lexeme, loc))
+
+            # Could this be a word that starts with a number? If so, continue parsing
+            if pos < len(source) and source[pos] not in SPACE_CHARACTERS | PUNCTUATION_CHARACTERS:
+                pos, lexeme2 = lex_word(source, pos)
+                tokens.append(Token(TokenType.WORD, f"{lexeme}{lexeme2}", loc))
+
+            # Else it's definitely a number so return a number
+            else:
+                tokens.append(Token(TokenType.NUMBER, lexeme, loc))
 
         elif char == "\"":
             pos, lexeme = lex_string(source, pos, loc)
