@@ -1,0 +1,21 @@
+-- Calculate the factorial of the following number
+6
+
+if dup 1 > then
+    -- Push a sentinel value under our number
+    0 swap
+
+    -- Push the values from n to 1 onto the stack
+    while dup 1 > do dup 1 - ;
+
+    -- While we haven't hit the sentinel value,
+    -- reduce by multiplying the top two numbers
+    while 2nd do * ;
+
+    -- Discard the sentinel
+    swap drop
+
+else 1;
+
+-- Print to show off the correct answer
+.

@@ -1,0 +1,23 @@
+-- The program, annotated with stack diagrams:
+-- -- push A and B
+-- 0 1         -- [ 0 1 ]
+-- while
+-- -- is B less than 100?
+--     dup     -- [ 0 1 1 ]
+--     100     -- [ 0 1 1 100 ]
+--     <       -- [ 0 1 1 ]
+-- do          -- [ 0 1 ]
+-- -- If so, print B
+--     dup     -- [ 0 1 1 ]
+--     .       -- [ 0 1 ]
+-- -- Then calculate the next number
+--     swap    -- [ 1 0 ]
+--     2nd     -- [ 1 0 1 ]
+--     +       -- [ 1 1 ]
+-- -- Then continue
+-- ;
+
+0 1
+while dup 100 < do
+    dup .
+    swap 2nd + ;

@@ -204,11 +204,23 @@ def lex_word(source: str, start: int) -> tuple[int, str]:
 #
 
 class InstrType(IntEnum):
+    SDUMP = auto()
     PUSH = auto()
+    SWAP = auto()
+    DROP = auto()
     DUP = auto()
+    SND = auto()
+    TRD = auto()
     ADD = auto()
     SUB = auto()
+    MUL = auto()
+    DIV = auto()
+    MOD = auto()
+    NOT = auto()
+    AND = auto()
+    OR = auto()
     EQ = auto()
+    LT = auto()
     GT = auto()
     PRINT = auto()
     LABEL = auto()
@@ -224,10 +236,22 @@ class Instr:
 
 
 BUILTINS = {
+    "<stack-dump>": Instr(InstrType.SDUMP),
+    "swap": Instr(InstrType.SWAP),
+    "drop": Instr(InstrType.DROP),
     "dup": Instr(InstrType.DUP),
+    "2nd": Instr(InstrType.SND),
+    "3rd": Instr(InstrType.TRD),
+    "not": Instr(InstrType.NOT),
+    "and": Instr(InstrType.AND),
+    "or": Instr(InstrType.OR),
     "+": Instr(InstrType.ADD),
     "-": Instr(InstrType.SUB),
+    "*": Instr(InstrType.MUL),
+    "/": Instr(InstrType.DIV),
+    "%": Instr(InstrType.MOD),
     "=": Instr(InstrType.EQ),
+    "<": Instr(InstrType.LT),
     ">": Instr(InstrType.GT),
     ".": Instr(InstrType.PRINT),
 }
@@ -260,7 +284,7 @@ def parse_expression(tokens: list[Token], start: int) -> tuple[int, list[Instr]]
 
         # Non builtin words can be handled by a call instruction
         elif token.typ is TokenType.WORD:
-            print(f"{token.loc} Error: User-defined words are currently unsupported.")
+            print(f"{token.loc} Error: User-defined words are currently unsupported: Unknown word '{token.lexeme}'.")
             exit(1)
 
         # IF ::= 'if' <exp> 'then' <exp> ('else-if' <exp> 'then' <exp>)* ('else' <exp>)? ';'
@@ -404,7 +428,7 @@ def interpret(instructions: list[Instr]) -> None:
         if instr.opcode is InstrType.LABEL
     }
 
-    assert len(InstrType) == 11, "Make sure all instructions are handled as necessary."
+    assert len(InstrType) == 23, "Make sure all instructions are handled as necessary."
 
     while ip < len(instructions):
         instr = instructions[ip]
@@ -423,20 +447,68 @@ def interpret(instructions: list[Instr]) -> None:
             left = stack.pop()
             stack.append(left - right)
 
+        elif instr.opcode is InstrType.MUL:
+            right = stack.pop()
+            left = stack.pop()
+            stack.append(left * right)
+
+        elif instr.opcode is InstrType.DIV:
+            right = stack.pop()
+            left = stack.pop()
+            stack.append(left // right)
+
+        elif instr.opcode is InstrType.MOD:
+            right = stack.pop()
+            left = stack.pop()
+            stack.append(left % right)
+
+        elif instr.opcode is InstrType.NOT:
+            top = stack.pop()
+            stack.append(int(not top))
+
+        elif instr.opcode is InstrType.AND:
+            left = stack.pop()
+            right = stack.pop()
+            stack.append(int(left and right))
+
+        elif instr.opcode is InstrType.OR:
+            left = stack.pop()
+            right = stack.pop()
+            stack.append(int(left or right))
+
         elif instr.opcode is InstrType.EQ:
             right = stack.pop()
             left = stack.pop()
             stack.append(int(left == right))
+
+        elif instr.opcode is InstrType.LT:
+            right = stack.pop()
+            left = stack.pop()
+            stack.append(int(left < right))
 
         elif instr.opcode is InstrType.GT:
             right = stack.pop()
             left = stack.pop()
             stack.append(int(left > right))
 
-        elif instr.opcode is InstrType.DUP:
+        elif instr.opcode is InstrType.SWAP:
             top = stack.pop()
+            snd = stack.pop()
             stack.append(top)
+            stack.append(snd)
+
+        elif instr.opcode is InstrType.DROP:
+            _ = stack.pop()
+
+        elif instr.opcode is InstrType.DUP:
+            top = stack[-1]
             stack.append(top)
+
+        elif instr.opcode is InstrType.SND:
+            stack.append(stack[-2])
+
+        elif instr.opcode is InstrType.TRD:
+            stack.append(stack[-3])
 
         elif instr.opcode is InstrType.LABEL:
             pass
@@ -452,6 +524,9 @@ def interpret(instructions: list[Instr]) -> None:
         elif instr.opcode is InstrType.PRINT:
             top = stack.pop()
             print(top)
+
+        elif instr.opcode is InstrType.SDUMP:
+            print(stack)
 
         elif instr.opcode is InstrType.END:
             return

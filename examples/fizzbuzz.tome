@@ -1,0 +1,48 @@
+-- -- At the time of writing we don't have a way to print characters, so for this implementation of fizzbuzz
+-- -- we will print '102' for fizz (ascii f), '66' for buzz (ascii b) and '122' for fizzbuzz (ascii z)
+--
+-- -- The upper bound of the loop
+-- 20                   -- [ 20 ]
+--
+-- -- What we start at
+-- 1                    -- [ 20 1 ]
+-- while
+--     dup              -- [ 20 1 1 ]
+--     3rd              -- [ 20 1 1 100 ]
+--     <                -- [ 20 1 1 ]
+-- do                   -- [ 20 1 ]
+--     if
+           dup 3 %      -- [ 20 1 1 ]
+           2nd 5 %      -- [ 20 1 1 1 ]
+           or           -- [ 20 1 1 ]
+           not          -- [ 20 1 0 ]
+--     then             -- [ 20 1 ]
+--         122 .
+--
+--     else-if
+            dup 3 %     -- [ 20 1 1 ]
+            not         -- [ 20 1 0 ]
+--     then             -- [ 20 1 ]
+--         102 .
+--
+--     else-if
+            dup 5 %     -- [ 20 1 1 ]
+            not         -- [ 20 1 0 ]
+--     then             -- [ 20 1 ]
+--         98 .
+--
+--     else
+--         dup . ;      -- [ 20 1 ]
+--
+--     1 +              -- [ 20 2 ]
+-- ;
+
+
+20
+
+1 while dup 3rd < do
+    if      dup 3 % 2nd 5 % or not then 122 .
+    else-if dup 3 % not            then 102 .
+    else-if dup 5 % not            then  98 .
+                                   else dup . ;
+    1 + ;
