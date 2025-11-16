@@ -36,7 +36,6 @@ class TokenType(IntEnum):
     WORD = auto()
     PUNC = auto()
     EOF = auto()
-    COUNT = auto()
 
 
 @dataclass
@@ -200,10 +199,10 @@ class InstrType(IntEnum):
     EQ = auto()
     GT = auto()
     PRINT = auto()
+    LABEL = auto()
     JMPF = auto()
     JMP = auto()
     END = auto()
-    COUNT = auto()
 
 
 @dataclass
@@ -234,10 +233,10 @@ def parse(tokens: list[Token]) -> list[Instr]:
     return instrs
 
 
-def parse_expression(tokens: list[Token], start: int, len_so_far: int = 0) -> tuple[int, list[Instr]]:
+def parse_expression(tokens: list[Token], start: int) -> tuple[int, list[Instr]]:
     pos, instrs = start, []
 
-    assert TokenType.COUNT == 7, "Make sure all token types are handled as necessary."
+    assert len(TokenType) == 6, "Make sure all token types are handled as necessary."
 
     while pos < len(tokens):
         token = tokens[pos]
@@ -254,83 +253,82 @@ def parse_expression(tokens: list[Token], start: int, len_so_far: int = 0) -> tu
 
         # IF ::= 'if' <exp> 'then' <exp> ('else-if' <exp> 'then' <exp>)* ('else' <exp>)? ';'
         elif token.typ is TokenType.KEY_WORD and token.lexeme == "if":
-            pos = expect_keyword("if", tokens, pos)
-            pos, cond = parse_expression(tokens, pos, len_so_far + len(instrs))
 
-            # We can emit the condition now, but we have to wait to emit
-            # any further instructions until we know where to jump to
+            # Parse out the condition and add its instructions
+            pos = expect_keyword("if", tokens, pos)
+            pos, cond = parse_expression(tokens, pos)
             instrs.extend(cond)
 
-            # Instead we can emit 'holes' to patch and record the index
-            false_branch = len(instrs)
-            instrs.append(Instr(InstrType.JMPF, None))
+            # We need to be able to jump to the false case, so
+            # create a label and hold onto it's text till we know
+            # where the label needs to be placed
+            false_branch = make_label()
+            instrs.append(Instr(InstrType.JMPF, false_branch))
 
+            # Parse out the body and add its instructions
             pos = expect_keyword("then", tokens, pos)
-            pos, body = parse_expression(tokens, pos, len_so_far + len(instrs))
-
+            pos, body = parse_expression(tokens, pos)
             instrs.extend(body)
 
-            # We also need to maintain a list of holes to be filled once
-            # we reach an else branch or fall off the end
-            end_jmp = len(instrs)
-            instrs.append(Instr(InstrType.JMP, None))
-            end_patch_list = [end_jmp]
+            # Now that the body has ended, we need to add a jump
+            # to wherever the if-statement ends, so make the label
+            end_label = make_label()
+            instrs.append(Instr(InstrType.JMP, end_label))
 
-            instrs[false_branch].operand = len_so_far + len(instrs)
+            # The false case starts here, so emit the label for it
+            instrs.append(Instr(InstrType.LABEL, false_branch))
 
-            # else-if blocks are largely the same as the above
             while pos < len(tokens) and tokens[pos].lexeme == "else-if":
-                pos = expect_keyword("else-if", tokens, pos)
-                pos, cond = parse_expression(tokens, pos, len_so_far + len(instrs))
 
+                # Parse the condition
+                pos = expect_keyword("else-if", tokens, pos)
+                pos, cond = parse_expression(tokens, pos)
                 instrs.extend(cond)
 
-                false_branch = len(instrs)
-                instrs.append(Instr(InstrType.JMPF, None))
+                # Emit the conditional jump
+                false_branch = make_label()
+                instrs.append(Instr(InstrType.JMPF, false_branch))
 
+                # Parse the body
                 pos = expect_keyword("then", tokens, pos)
-                pos, body = parse_expression(tokens, pos, len_so_far + len(instrs))
-
+                pos, body = parse_expression(tokens, pos)
                 instrs.extend(body)
 
-                end_jmp = len(instrs)
-                instrs.append(Instr(InstrType.JMP, None))
-                end_patch_list.append(end_jmp)
+                # Emit the jump to the end, reusing the label
+                instrs.append(Instr(InstrType.JMP, end_label))
 
-                instrs[false_branch].operand = len_so_far + len(instrs)
+                # The false case starts here
+                instrs.append(Instr(InstrType.LABEL, false_branch))
 
             if pos < len(tokens) and tokens[pos].lexeme == "else":
+                # The final else has no condition so just parse body
                 pos = expect_keyword("else", tokens, pos)
-                pos, body = parse_expression(tokens, pos, len_so_far + len(instrs))
-
+                pos, body = parse_expression(tokens, pos)
                 instrs.extend(body)
 
-            # Go through and fill all the holes we left
-            # TODO: If we only have an if and no else, we can remove the hole instead
-            for patch_index in end_patch_list:
-                instrs[patch_index].operand = len_so_far + len(instrs)
-
             pos = expect_keyword(";", tokens, pos)
+            instrs.append(Instr(InstrType.LABEL, end_label))
 
         # WHILE ::= 'while' <exp> 'do' <exp> ';'
         elif token.typ is TokenType.KEY_WORD and token.lexeme == "while":
-            loop_start = len(instrs) + len_so_far
+            loop_start = make_label()
+            instrs.append(Instr(InstrType.LABEL, loop_start))
 
             pos = expect_keyword("while", tokens, pos)
-            pos, cond = parse_expression(tokens, pos, len_so_far)
+            pos, cond = parse_expression(tokens, pos)
             instrs.extend(cond)
 
-            false_branch = len(instrs)
-            instrs.append(Instr(InstrType.JMPF, None))
+            false_branch = make_label()
+            instrs.append(Instr(InstrType.JMPF, false_branch))
 
             pos = expect_keyword("do", tokens, pos)
-            pos, body = parse_expression(tokens, pos, len_so_far)
+            pos, body = parse_expression(tokens, pos)
             instrs.extend(body)
 
             instrs.append(Instr(InstrType.JMP, loop_start))
-            instrs[false_branch].operand = len(instrs) + len_so_far
 
             pos = expect_keyword(";", tokens, pos)
+            instrs.append(Instr(InstrType.LABEL, false_branch))
 
         # Numbers simply push their value onto the stack
         elif token.typ is TokenType.NUMBER:
@@ -358,6 +356,17 @@ def expect_keyword(lexeme: str, tokens: list[Token], index: int) -> int:
     return index + 1
 
 
+LABEL = 0
+
+
+def make_label() -> str:
+    global LABEL
+
+    cur = LABEL
+    LABEL = LABEL + 1
+    return f"L{cur}"
+
+
 # ---------------------------------------------------------------------------------------------------------------------
 # Interpreter Implementation
 #
@@ -365,7 +374,17 @@ def expect_keyword(lexeme: str, tokens: list[Token], index: int) -> int:
 def interpret(instructions: list[Instr]) -> None:
     ip, stack = 0, []
 
-    assert InstrType.COUNT == 11, "Make sure all instructions are handled as necessary."
+    # Find all the labels in the program and
+    # record their index so that the interpreter
+    # can jump to them via this lookup table
+    jump_table: dict[str, int] = {
+        instr.operand: ip + 1
+        for ip, instr
+        in enumerate(instructions)
+        if instr.opcode is InstrType.LABEL
+    }
+
+    assert len(InstrType) == 11, "Make sure all instructions are handled as necessary."
 
     while ip < len(instructions):
         instr = instructions[ip]
@@ -399,13 +418,16 @@ def interpret(instructions: list[Instr]) -> None:
             stack.append(top)
             stack.append(top)
 
+        elif instr.opcode is InstrType.LABEL:
+            pass
+
         elif instr.opcode is InstrType.JMPF:
             top = stack.pop()
             if top == 0:
-                ip = instr.operand
+                ip = jump_table[instr.operand]
 
         elif instr.opcode is InstrType.JMP:
-            ip = instr.operand
+            ip = jump_table[instr.operand]
 
         elif instr.opcode is InstrType.PRINT:
             top = stack.pop()
@@ -427,9 +449,9 @@ def interpret(instructions: list[Instr]) -> None:
 #
 
 def dump_ir(instructions: list[Instr]) -> None:
-    print("_[ IP ]____MNEM____OP_")
+    print("__[ IP ]____MNEM____OP__")
     for i, instr in enumerate(instructions):
-        print(f" [{i:04}]    {instr.opcode.name:8}{instr.operand if instr.operand is not None else ''}")
+        print(f"  [{i:04}]    {instr.opcode.name:8}{instr.operand if instr.operand is not None else ''}")
 
 
 # ---------------------------------------------------------------------------------------------------------------------
