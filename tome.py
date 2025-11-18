@@ -48,7 +48,6 @@ def do_compile(instructions: 'list[Instr]') -> None:
 
     run(["nasm", "-felf64", "out.asm", "-o", "out.o"])
     run(["ld", "out.o", "-o", "out"])
-    run(["./out"])
 
 
 def do_interpret(instructions: 'list[Instr]') -> None:
