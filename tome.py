@@ -1,32 +1,58 @@
-from sys import argv, exit
 from enum import IntEnum, auto
+from typing import Type, TextIO
 from dataclasses import dataclass
+from subprocess import run
+
+import argparse
 
 
-def main(args: list[str]) -> None:
-    name, *rest = args
+# ---------------------------------------------------------------------------------------------------------------------
+# CLI Implementation
+#
 
-    if len(rest) < 1:
-        print(f"Error: Invalid command.")
-        print(f"Usage: {name} <filepath>")
-        exit(1)
+def main() -> None:
+    parser = argparse.ArgumentParser(description="CLI for the Tome programming language.")
 
-    file_name, *_ = rest
-    do_compile(file_name)
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument(
+        "-c", "--compile",
+        action="store_true",
+        help="Compile the file (targeting x86_64 linux)")
+    group.add_argument(
+        "-i", "--interpret",
+        action="store_true",
+        help="Interpret the file")
+
+    parser.add_argument("filename", help="The path to the source file")
+
+    args = parser.parse_args()
+    ir = frontend(args.filename)
+
+    if args.compile:
+        do_compile(ir)
+    else:
+        do_interpret(ir)
 
 
-def do_compile(path: str) -> None:
+def frontend(path: str) -> 'list[Instr]':
     with open(path, "r") as source_file:
         source = source_file.read()
-
     tokens = lex(source, path)
     instrs = parse(tokens)
+    return instrs
 
-    print("--- BYTECODE ---")
-    dump_ir(instrs)
 
-    print("\n--- RESULT ---")
-    interpret(instrs)
+def do_compile(instructions: 'list[Instr]') -> None:
+    with open("out.asm", "w") as out:
+        gen_code(instructions, Linux_x86_64, out)
+
+    run(["nasm", "-felf64", "out.asm", "-o", "out.o"])
+    run(["ld", "out.o", "-o", "out"])
+    run(["./out"])
+
+
+def do_interpret(instructions: 'list[Instr]') -> None:
+    interpret(instructions)
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -190,6 +216,9 @@ def lex_string(source: str, start: int, loc: Loc) -> tuple[int, str]:
         else:
             string_content += char
             pos = pos + 1
+
+    print("This should be unreachable.")
+    exit(1)
 
 
 def lex_word(source: str, start: int) -> tuple[int, str]:
@@ -421,7 +450,7 @@ def interpret(instructions: list[Instr]) -> None:
     # Find all the labels in the program and
     # record their index so that the interpreter
     # can jump to them via this lookup table
-    jump_table: dict[str, int] = {
+    jump_table = {
         instr.operand: ip + 1
         for ip, instr
         in enumerate(instructions)
@@ -540,6 +569,278 @@ def interpret(instructions: list[Instr]) -> None:
 
 
 # ---------------------------------------------------------------------------------------------------------------------
+# Compiler Implementation
+#
+
+class Backend:
+    @staticmethod
+    def _emit_all(file: TextIO, strings: list[str]) -> None:
+        file.write("".join(line + "\n" for line in strings))
+
+    @staticmethod
+    def begin(file: TextIO) -> None:
+        """Emits assembly prelude"""
+        _ = file
+        raise NotImplementedError("Backend must be a derived class representing a target")
+
+    @staticmethod
+    def end(file: TextIO) -> None:
+        """Emits assembly postlude"""
+        _ = file
+        raise NotImplementedError("Backend must be a derived class representing a target")
+
+    @staticmethod
+    def emit_instruction(file: TextIO, instruction: Instr) -> None:
+        """Emits a single instruction"""
+        _, _ = file, instruction
+        raise NotImplementedError("Backend must be a derived class representing a target")
+
+
+def gen_code(ir: list[Instr], backend: Type[Backend], file: TextIO) -> None:
+    backend.begin(file)
+    for instruction in ir:
+        backend.emit_instruction(file, instruction)
+    backend.end(file)
+
+
+class Linux_x86_64(Backend):
+    @staticmethod
+    def begin(file: TextIO) -> None:
+        Backend._emit_all(file, [
+            "section .text",
+            "global _start",
+            "_start:"
+        ])
+
+    @staticmethod
+    def end(file: TextIO) -> None:
+        Backend._emit_all(file, [
+            "print:",
+            "    sub     rsp, 32",
+            "    mov     rsi, rsp",
+            "    mov     byte [rsi + 31], 10",
+            "    lea     r8, [rsi + 30]",
+            "    mov     rcx, 1",
+            "    mov     rbx, 10",
+            ".convert_loop:",
+            "    xor     rdx, rdx",
+            "    mov     rax, rdi",
+            "    div     rbx",
+            "    add     dl, '0'",
+            "    mov     byte [r8], dl",
+            "    dec     r8",
+            "    inc     rcx",
+            "    mov     rdi, rax",
+            "    test    rax, rax",
+            "    jne     .convert_loop",
+            "    inc     r8",
+            "    mov     rax, 1",
+            "    mov     rdi, 1",
+            "    mov     rsi, r8",
+            "    mov     rdx, rcx",
+            "    syscall",
+            "    add     rsp, 32",
+            "    ret",
+        ])
+
+    @staticmethod
+    def emit_instruction(file: TextIO, instruction: Instr) -> None:
+        opcode, operand = instruction.opcode, instruction.operand
+
+        assert len(InstrType) == 23, "make sure to account for all instruction types"
+
+        if opcode is InstrType.PUSH:
+            Backend._emit_all(file, [
+                f"; {operand}",
+                f"    push    {operand}"
+            ])
+
+        elif opcode is InstrType.LABEL:
+            Backend._emit_all(file, [
+                f"{operand}:"
+            ])
+
+        elif opcode is InstrType.DUP:
+            Backend._emit_all(file, [
+                f"; dup",
+                f"    mov     rdx, [rsp]",
+                f"    push    rdx"
+            ])
+
+        elif opcode is InstrType.SND:
+            Backend._emit_all(file, [
+                f"; 2nd",
+                f"    mov     rdx, [rsp+8]",
+                f"    push    rdx",
+            ])
+
+        elif opcode is InstrType.TRD:
+            Backend._emit_all(file, [
+                f"; 3rd",
+                f"    mov     rdx, [rsp+16]",
+                f"    push    rdx",
+            ])
+
+        elif opcode is InstrType.SWAP:
+            Backend._emit_all(file, [
+                f"; swap",
+                f"    pop     rax",
+                f"    pop     rdx",
+                f"    push    rax",
+                f"    push    rdx"
+            ])
+
+        elif opcode is InstrType.DROP:
+            Backend._emit_all(file, [
+                f"; drop",
+                f"    pop     rax",
+            ])
+
+        elif opcode is InstrType.EQ:
+            Backend._emit_all(file, [
+                f"; eq",
+                f"    pop     rbx",
+                f"    pop     rax",
+                f"    cmp     rax, rbx",
+                f"    sete    al",
+                f"    movzx   rax, al",
+                f"    push    rax"
+            ])
+
+        elif opcode is InstrType.GT:
+            Backend._emit_all(file, [
+                f"; gt",
+                f"    pop     rbx",
+                f"    pop     rax",
+                f"    cmp     rax, rbx",
+                f"    setg    al",
+                f"    movzx   rax, al",
+                f"    push    rax"
+            ])
+
+        elif opcode is InstrType.LT:
+            Backend._emit_all(file, [
+                f"; lt",
+                f"    pop     rbx",
+                f"    pop     rax",
+                f"    cmp     rax, rbx",
+                f"    setl    al",
+                f"    movzx   rax, al",
+                f"    push    rax"
+            ])
+
+        elif opcode is InstrType.OR:
+            Backend._emit_all(file, [
+                f"; or",
+                f"    pop     rbx",
+                f"    pop     rax",
+                f"    or      rax, rbx",
+                f"    push    rax",
+            ])
+
+        elif opcode is InstrType.AND:
+            Backend._emit_all(file, [
+                f"; and",
+                f"    pop     rbx",
+                f"    pop     rax",
+                f"    and     rax, rbx",
+                f"    push    rax",
+            ])
+
+        elif opcode is InstrType.NOT:
+            Backend._emit_all(file, [
+                f"; not",
+                f"    pop     rax",
+                f"    xor     rax, 1",
+                f"    push    rax"
+            ])
+
+        elif opcode is InstrType.JMPF:
+            Backend._emit_all(file, [
+                f"; jmpf",
+                f"    pop     rax",
+                f"    cmp     rax, 0",
+                f"    je      {operand}"
+            ])
+
+        elif opcode is InstrType.JMP:
+            Backend._emit_all(file, [
+                f"; jmp",
+                f"    jmp     {operand}"
+            ])
+
+        elif opcode is InstrType.PRINT:
+            Backend._emit_all(file, [
+                f"; print",
+                f"    pop     rdi",
+                f"    call    print"
+            ])
+
+        elif opcode is InstrType.ADD:
+            Backend._emit_all(file, [
+                f"; add",
+                f"    pop     rbx",
+                f"    pop     rax",
+                f"    add     rax, rbx",
+                f"    push    rax"
+            ])
+
+        elif opcode is InstrType.SUB:
+            Backend._emit_all(file, [
+                f"; sub",
+                f"    pop     rbx",
+                f"    pop     rax",
+                f"    sub     rax, rbx",
+                f"    push    rax",
+            ])
+
+        elif opcode is InstrType.MUL:
+            Backend._emit_all(file, [
+                f"; mul",
+                f"    pop     rbx",
+                f"    pop     rax",
+                f"    imul    rax, rbx",
+                f"    push    rax",
+            ])
+
+        elif opcode is InstrType.DIV:
+            Backend._emit_all(file, [
+                f"; div",
+                f"    pop     rbx",
+                f"    pop     rax",
+                f"    xor     rdx, rdx",
+                f"    idiv    rbx",
+                f"    push    rax",
+            ])
+
+        elif opcode is InstrType.MOD:
+            Backend._emit_all(file, [
+                f"; mod",
+                f"    pop     rbx",
+                f"    pop     rax",
+                f"    xor     rdx, rdx",
+                f"    idiv    rbx",
+                f"    push    rdx",
+            ])
+
+        elif opcode is InstrType.END:
+            Backend._emit_all(file, [
+                f"; end",
+                f"    mov     rax, 60",
+                f"    xor     rdi, rdi",
+                f"    syscall",
+            ])
+
+        elif opcode is InstrType.SDUMP:
+            print("Stack Dump is unimplemented for compiler right now.")
+            exit(1)
+
+        else:
+            print(f"Unimplemented Instruction: {opcode.name}")
+            exit(1)
+
+
+# ---------------------------------------------------------------------------------------------------------------------
 # Debug Helpers
 #
 
@@ -561,4 +862,5 @@ def dump_ir(instructions: list[Instr]) -> None:
 #
 
 if __name__ == "__main__":
-    main(argv)
+    main()
+

@@ -15,22 +15,19 @@
 --     <                -- [ 20 1 1 ]
 -- do                   -- [ 20 1 ]
 --     if
---         dup 3 %      -- [ 20 1 1 ]
---         2nd 5 %      -- [ 20 1 1 1 ]
---         or           -- [ 20 1 1 ]
---         not          -- [ 20 1 0 ]
+--         dup 3 % 0 =  -- [ 20 1 0 ]
+--         2nd 5 % 0 =  -- [ 20 1 0 0 ]
+--         and          -- [ 20 1 0 ]
 --     then             -- [ 20 1 ]
 --         122 .        -- skipped
 --
 --     else-if
---          dup 3 %     -- [ 20 1 1 ]
---          not         -- [ 20 1 0 ]
+--          dup 3 % 0 = -- [ 20 1 0 ]
 --     then             -- [ 20 1 ]
 --         102 .        -- skipped
 --
 --     else-if
---          dup 5 %     -- [ 20 1 1 ]
---          not         -- [ 20 1 0 ]
+--          dup 5 % 0 = -- [ 20 1 0 ]
 --     then             -- [ 20 1 ]
 --         98 .         -- skipped
 --
@@ -44,8 +41,8 @@
 20
 
 1 while dup 3rd < do
-    if      dup 3 % 2nd 5 % or not then 122 .
-    else-if dup 3 % not            then 102 .
-    else-if dup 5 % not            then  98 .
-                                   else dup . ;
+    if      dup 3 % 0 = 2nd 5 % 0 = and then 122 .
+    else-if dup 3 % 0 =                 then 102 .
+    else-if dup 5 % 0 =                 then  98 .
+                                        else dup . ;
     1 + ;
