@@ -625,8 +625,12 @@ class Linux_x86_64(Backend):
     @staticmethod
     def begin(file: TextIO) -> None:
         Backend._emit_all(file, [
-            "section .text",
             "global _start",
+            "global heap_base",
+            "section .bss",
+            "heap_base:",
+            "    resb 1024*1024",
+            "section .text",
             "_start:"
         ])
 
@@ -674,16 +678,24 @@ class Linux_x86_64(Backend):
             ])
 
         elif opcode is InstrType.BASEP:
-            print("Error: Base Pointer is currently unimplemented.")
-            exit(1)
+            Backend._emit_all(file, [
+                f"    lea     rax, [rel heap_base]",
+                f"    push    rax",
+            ])
 
         elif opcode is InstrType.WRITE:
-            print("Error: Write is currently unimplemented.")
-            exit(1)
+            Backend._emit_all(file, [
+                f"    pop     rcx",
+                f"    pop     rax",
+                f"    mov     qword [rcx], rax",
+            ])
 
         elif opcode is InstrType.READ:
-            print("Error: Read is currently unimplemented.")
-            exit(1)
+            Backend._emit_all(file, [
+                f"    pop     rcx",
+                f"    mov     rax, [rcx]",
+                f"    push    rax",
+            ])
 
         elif opcode is InstrType.LABEL:
             Backend._emit_all(file, [

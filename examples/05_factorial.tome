@@ -2,7 +2,6 @@
 -- -- with a diagram of the stack at each step to help you trace how
 -- -- values move around as words execute
 --
---
 -- -- Push the number we wish to find the factorial of to the stack
 -- 6               -- [ 6 ]
 --
