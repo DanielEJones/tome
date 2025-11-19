@@ -303,7 +303,7 @@ def parse_expression(tokens: list[Token], start: int) -> tuple[int, list[Instr]]
     assert len(TokenType) == 6, "Make sure all token types are handled as necessary."
 
     while pos < len(tokens):
-        token = tokens[pos]
+        token: Token = tokens[pos]
 
         # Builtin words can be handled by their respective instruction
         if token.typ is TokenType.WORD and token.lexeme in BUILTINS:
@@ -862,4 +862,3 @@ def dump_ir(instructions: list[Instr]) -> None:
 
 if __name__ == "__main__":
     main()
-
