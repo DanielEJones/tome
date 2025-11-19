@@ -125,6 +125,18 @@ Currently, tome has no concept of a boolean and relies on values of `1` and `0` 
 1 2 drop    -- [ 1 ]
 ```
 
+### Memory Access
+```tome
+-- `#` (Pushes the address of the beggining of the heap)
+#           -- [ `base` ]
+
+-- `read` (Reads a 64 bit integer at the address specified)
+# 8 + read  -- [ `heap[base+8]` ]
+
+-- `write` (Write a 64 bit integer to the address specified)
+10 # 8 + write      -- [ ]
+```
+
 ### Miscellaneous
 ```tome
 -- `.` (print)

@@ -4,6 +4,7 @@
 -- -- The following is a program listed out word-by-word and annotated
 -- -- with a diagram of the stack at each step to help you trace how
 -- -- values move around as words execute
+--
 -- -- The upper bound of the loop
 -- 20                   -- [ 20 ]
 --

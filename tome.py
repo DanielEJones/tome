@@ -233,6 +233,10 @@ def lex_word(source: str, start: int) -> tuple[int, str]:
 
 class InstrType(IntEnum):
     SDUMP = auto()
+    WRITE = auto()
+    READ = auto()
+    WCH = auto()
+    RCH = auto()
     PUSH = auto()
     SWAP = auto()
     DROP = auto()
@@ -250,6 +254,7 @@ class InstrType(IntEnum):
     EQ = auto()
     LT = auto()
     GT = auto()
+    BASEP = auto()
     PRINT = auto()
     LABEL = auto()
     JMPF = auto()
@@ -265,6 +270,10 @@ class Instr:
 
 BUILTINS = {
     "<stack-dump>": Instr(InstrType.SDUMP),
+    "write-ch": Instr(InstrType.WCH),
+    "read-ch": Instr(InstrType.RCH),
+    "write": Instr(InstrType.WRITE),
+    "read": Instr(InstrType.READ),
     "swap": Instr(InstrType.SWAP),
     "drop": Instr(InstrType.DROP),
     "dup": Instr(InstrType.DUP),
@@ -282,6 +291,7 @@ BUILTINS = {
     "<": Instr(InstrType.LT),
     ">": Instr(InstrType.GT),
     ".": Instr(InstrType.PRINT),
+    "#": Instr(InstrType.BASEP),
 }
 
 
@@ -444,7 +454,7 @@ def make_label() -> str:
 #
 
 def interpret(instructions: list[Instr]) -> None:
-    ip, stack = 0, []
+    ip, stack, heap = 0, [], bytearray(1024 * 1024)
 
     # Find all the labels in the program and
     # record their index so that the interpreter
@@ -456,7 +466,7 @@ def interpret(instructions: list[Instr]) -> None:
         if instr.opcode is InstrType.LABEL
     }
 
-    assert len(InstrType) == 23, "Make sure all instructions are handled as necessary."
+    assert len(InstrType) == 28, "Make sure all instructions are handled as necessary."
 
     while ip < len(instructions):
         instr = instructions[ip]
@@ -464,6 +474,29 @@ def interpret(instructions: list[Instr]) -> None:
 
         if instr.opcode is InstrType.PUSH:
             stack.append(instr.operand)
+
+        elif instr.opcode is InstrType.BASEP:
+            stack.append(0)
+
+        elif instr.opcode is InstrType.WRITE:
+            address = stack.pop()
+            value: int = stack.pop()
+            heap[address:address+8] = value.to_bytes(8, "little")
+
+        elif instr.opcode is InstrType.READ:
+            address = stack.pop()
+            value: int = int.from_bytes(heap[address:address+8], "little")
+            stack.append(value)
+
+        elif instr.opcode is InstrType.WCH:
+            address = stack.pop()
+            value: int = stack.pop()
+            heap[address:address+1] = value.to_bytes(1, "little")
+
+        elif instr.opcode is InstrType.RCH:
+            address = stack.pop()
+            value: int = int.from_bytes(heap[address:address+1], "little")
+            stack.append(value)
 
         elif instr.opcode is InstrType.ADD:
             right = stack.pop()
@@ -606,8 +639,12 @@ class Linux_x86_64(Backend):
     @staticmethod
     def begin(file: TextIO) -> None:
         Backend._emit_all(file, [
-            "section .text",
             "global _start",
+            "global heap_base",
+            "section .bss",
+            "heap_base:",
+            "    resb 1024*1024",
+            "section .text",
             "_start:"
         ])
 
@@ -646,12 +683,46 @@ class Linux_x86_64(Backend):
     def emit_instruction(file: TextIO, instruction: Instr) -> None:
         opcode, operand = instruction.opcode, instruction.operand
 
-        assert len(InstrType) == 23, "make sure to account for all instruction types"
+        assert len(InstrType) == 28, "make sure to account for all instruction types"
 
         if opcode is InstrType.PUSH:
             Backend._emit_all(file, [
                 f"; {operand}",
                 f"    push    {operand}"
+            ])
+
+        elif opcode is InstrType.BASEP:
+            Backend._emit_all(file, [
+                f"    lea     rax, [rel heap_base]",
+                f"    push    rax",
+            ])
+
+        elif opcode is InstrType.WRITE:
+            Backend._emit_all(file, [
+                f"    pop     rcx",
+                f"    pop     rax",
+                f"    mov     qword [rcx], rax",
+            ])
+
+        elif opcode is InstrType.WCH:
+            Backend._emit_all(file, [
+                f"    pop     rcx",
+                f"    pop     rax",
+                f"    mov     byte [rcx], al",
+            ])
+
+        elif opcode is InstrType.READ:
+            Backend._emit_all(file, [
+                f"    pop     rcx",
+                f"    mov     rax, [rcx]",
+                f"    push    rax",
+            ])
+
+        elif opcode is InstrType.RCH:
+            Backend._emit_all(file, [
+                f"    pop     rcx",
+                f"    movzx   rax, byte [rcx]",
+                f"    push rax",
             ])
 
         elif opcode is InstrType.LABEL:

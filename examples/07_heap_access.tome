@@ -1,0 +1,42 @@
+-- -- The following is a program listed out word-by-word and annotated
+-- -- with a diagram of the stack at each step to help you trace how
+-- -- values move around as words execute
+--
+-- -- Write 0 at an offset of 8 bytes
+-- 0           -- [ 0 ]
+-- #           -- [ 0 base ]
+-- 8           -- [ 0 base 8 ]
+-- +           -- [ 0 base+8 ]
+-- write       -- [ ]
+--
+-- while
+-- -- Read the value from offset 8
+--     #       -- [ base ]
+--     8       -- [ base 8 ]
+--     +       -- [ base+8 ]
+--     read    -- [ 0 ]
+-- -- Compare it to 10
+--     dup     -- [ 0 0 ]
+--     10      -- [ 0 0 10 ]
+--     <       -- [ 0 1 ]
+--
+-- do          -- [ 0 ]
+-- -- Print and then increment
+--     dup     -- [ 0 0 ]
+--     .       -- [ 0 ]
+--     1       -- [ 0 1 ]
+--     +       -- [ 1 ]
+--
+-- -- Write the value back
+--     #       -- [ 1 base ]
+--     8       -- [ 1 base 8 ]
+--     +       -- [ 1 base+8 ]
+--     write   -- [ ]
+-- ;
+
+0 # 8 + write
+
+while # 8 + read dup 10 < do
+    dup . 1 +
+    # 8 + write;
+

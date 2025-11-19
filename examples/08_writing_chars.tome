@@ -1,0 +1,20 @@
+-- "hello, world!"
+104     #  0 + write-ch
+101     #  1 + write-ch
+108     #  2 + write-ch
+108     #  3 + write-ch
+111     #  4 + write-ch
+ 44     #  5 + write-ch
+ 32     #  6 + write-ch
+119     #  7 + write-ch
+111     #  8 + write-ch
+114     #  9 + write-ch
+108     # 10 + write-ch
+100     # 11 + write-ch
+ 33     # 12 + write-ch
+
+-- write the codes out
+ 0 while dup 13 < do
+    dup # swap + read-ch .
+    1 + ;
+
