@@ -233,6 +233,8 @@ def lex_word(source: str, start: int) -> tuple[int, str]:
 
 class InstrType(IntEnum):
     SDUMP = auto()
+    WRITE = auto()
+    READ = auto()
     PUSH = auto()
     SWAP = auto()
     DROP = auto()
@@ -250,6 +252,7 @@ class InstrType(IntEnum):
     EQ = auto()
     LT = auto()
     GT = auto()
+    BASEP = auto()
     PRINT = auto()
     LABEL = auto()
     JMPF = auto()
@@ -265,6 +268,8 @@ class Instr:
 
 BUILTINS = {
     "<stack-dump>": Instr(InstrType.SDUMP),
+    "write": Instr(InstrType.WRITE),
+    "read": Instr(InstrType.READ),
     "swap": Instr(InstrType.SWAP),
     "drop": Instr(InstrType.DROP),
     "dup": Instr(InstrType.DUP),
@@ -282,6 +287,7 @@ BUILTINS = {
     "<": Instr(InstrType.LT),
     ">": Instr(InstrType.GT),
     ".": Instr(InstrType.PRINT),
+    "#": Instr(InstrType.BASEP),
 }
 
 
@@ -444,7 +450,7 @@ def make_label() -> str:
 #
 
 def interpret(instructions: list[Instr]) -> None:
-    ip, stack = 0, []
+    ip, stack, heap = 0, [], bytearray(1024 * 1024)
 
     # Find all the labels in the program and
     # record their index so that the interpreter
@@ -456,7 +462,7 @@ def interpret(instructions: list[Instr]) -> None:
         if instr.opcode is InstrType.LABEL
     }
 
-    assert len(InstrType) == 23, "Make sure all instructions are handled as necessary."
+    assert len(InstrType) == 26, "Make sure all instructions are handled as necessary."
 
     while ip < len(instructions):
         instr = instructions[ip]
@@ -464,6 +470,19 @@ def interpret(instructions: list[Instr]) -> None:
 
         if instr.opcode is InstrType.PUSH:
             stack.append(instr.operand)
+
+        elif instr.opcode is InstrType.BASEP:
+            stack.append(0)
+
+        elif instr.opcode is InstrType.WRITE:
+            address = stack.pop()
+            value: int = stack.pop()
+            heap[address:address+8] = value.to_bytes(8, "little")
+
+        elif instr.opcode is InstrType.READ:
+            address = stack.pop()
+            value: int = int.from_bytes(heap[address:address+8], "little")
+            stack.append(value)
 
         elif instr.opcode is InstrType.ADD:
             right = stack.pop()
@@ -646,13 +665,25 @@ class Linux_x86_64(Backend):
     def emit_instruction(file: TextIO, instruction: Instr) -> None:
         opcode, operand = instruction.opcode, instruction.operand
 
-        assert len(InstrType) == 23, "make sure to account for all instruction types"
+        assert len(InstrType) == 26, "make sure to account for all instruction types"
 
         if opcode is InstrType.PUSH:
             Backend._emit_all(file, [
                 f"; {operand}",
                 f"    push    {operand}"
             ])
+
+        elif opcode is InstrType.BASEP:
+            print("Error: Base Pointer is currently unimplemented.")
+            exit(1)
+
+        elif opcode is InstrType.WRITE:
+            print("Error: Write is currently unimplemented.")
+            exit(1)
+
+        elif opcode is InstrType.READ:
+            print("Error: Read is currently unimplemented.")
+            exit(1)
 
         elif opcode is InstrType.LABEL:
             Backend._emit_all(file, [

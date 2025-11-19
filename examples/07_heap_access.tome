@@ -1,0 +1,16 @@
+-- write 0 at an offset of 8 bytes
+0 # 8 + write
+
+while
+-- read the value from offset 8
+    # 8 + read
+
+-- compare it to 10
+    dup 10 <
+
+do
+-- print and then increment
+    dup . 1 +
+
+-- write the value back
+    # 8 + write ;
