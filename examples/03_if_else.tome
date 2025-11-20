@@ -37,6 +37,6 @@
 
 6
 
-if      dup 5 < then 108 .
-else-if dup 5 > then 104 .
-                else 101 . ;
+if      dup 5 < then 'l' .
+else-if dup 5 > then 'g' .
+                else 'e' . ;

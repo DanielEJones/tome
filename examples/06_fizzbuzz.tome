@@ -1,6 +1,3 @@
--- At the time of writing we don't have a way to print characters, so for this implementation of fizzbuzz
--- we will print '102' for fizz (ascii f), '98' for buzz (ascii b) and '122' for fizzbuzz (ascii z)
-
 -- -- The following is a program listed out word-by-word and annotated
 -- -- with a diagram of the stack at each step to help you trace how
 -- -- values move around as words execute
@@ -42,8 +39,8 @@
 20
 
 1 while dup 3rd < do
-    if      dup 3 % 0 = 2nd 5 % 0 = and then 122 .
-    else-if dup 3 % 0 =                 then 102 .
-    else-if dup 5 % 0 =                 then  98 .
+    if      dup 3 % 0 = 2nd 5 % 0 = and then 'z' .
+    else-if dup 3 % 0 =                 then 'f'.
+    else-if dup 5 % 0 =                 then 'b' .
                                         else dup . ;
     1 + ;

@@ -132,6 +132,10 @@ def lex(source: str, file_name: str) -> list[Token]:
             else:
                 tokens.append(Token(TokenType.NUMBER, lexeme, loc))
 
+        elif char == "\'":
+            pos, lexeme = lex_char(source, pos, loc)
+            tokens.append(Token(TokenType.NUMBER, lexeme, loc))
+
         elif char == "\"":
             pos, lexeme = lex_string(source, pos, loc)
             tokens.append(Token(TokenType.STRING, lexeme, loc))
@@ -172,6 +176,46 @@ def lex_number(source: str, start: int) -> tuple[int, str]:
     return pos, source[start:pos]
 
 
+def lex_char(source: str, start: int, loc: Loc) -> tuple[int, str]:
+    if source[start] != "\'":
+        print(f"{loc} Error: Character literal must begin with a quote.")
+        exit(1)
+
+    pos = start + 1
+    if not pos < len(source):
+        print(f"{loc} Error: Unterminated Character literal.")
+        exit(1)
+
+    cur = source[pos]
+    if cur == "\\":
+        if not pos + 1 < len(source):
+            print(f"{loc} Error: Unterminated Character literal.")
+            exit(1)
+
+        pos = pos + 1
+        nxt = source[pos]
+        if nxt == "n":
+            lexeme = str(ord("\n"))
+        elif nxt == "t":
+            lexeme = str(ord("\t"))
+        elif nxt == "\'":
+            lexeme = str(ord("\'"))
+        else:
+            print(f"{loc.shift(2)} Error: Unrecognised Escape Sequence.")
+            exit(1)
+
+    else:
+        lexeme = str(ord(cur))
+
+    pos = pos + 1
+    if not (pos < len(source) and source[pos] == "\'"):
+        print(f"{loc} Error: Unterminated Character literal.")
+        exit(1)
+
+    pos = pos + 1
+    return pos, lexeme
+
+
 def lex_string(source: str, start: int, loc: Loc) -> tuple[int, str]:
     if source[start] != "\"":
         print(f"{loc} Error: String must begin with a quote.")
@@ -194,16 +238,12 @@ def lex_string(source: str, start: int, loc: Loc) -> tuple[int, str]:
 
             next_ = source[pos + 1]
             pos = pos + 2
-
             if next_ == "\\" or next_ == "\"":
                 string_content += next_
-
             elif next_ == "n":
                 string_content += "\n"
-
-            elif next_ == "\t":
+            elif next_ == "t":
                 string_content += "\t"
-
             else:
                 print(f"{loc.shift(pos - start + 1)} Error: Unrecognised escape sequence.")
                 exit(1)

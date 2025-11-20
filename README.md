@@ -52,13 +52,16 @@ Tome is a stack based language, meaning that all operations rely implicitly on a
 hold their outputs.
 
 ## Literals
-Tome currently supports integer literals. To push an integer literal to the stack, simply write it into your program:
+Tome currently supports integer and character literals:
 ```tome
 -- push a `1` onto the stack
 1           -- [ 1 ]
 
 -- now we push a `2` and a `3` also
 2 3         -- [ 1 2 3 ]
+
+-- push the ascii representation of 'f' onto the stack
+'f'         -- [ 1 2 3 102 ]
 ```
 
 ## Words
