@@ -242,7 +242,7 @@ def lex_string(source: str, start: int, loc: Loc) -> tuple[int, str]:
                 string_content += next_
             elif next_ == "n":
                 string_content += "\n"
-            elif next_ == "\t":
+            elif next_ == "t":
                 string_content += "\t"
             else:
                 print(f"{loc.shift(pos - start + 1)} Error: Unrecognised escape sequence.")
