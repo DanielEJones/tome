@@ -132,6 +132,47 @@ def lex(source: str, file_name: str) -> list[Token]:
             else:
                 tokens.append(Token(TokenType.NUMBER, lexeme, loc))
 
+        elif char == "\'":
+            pos = pos + 1
+
+            if not pos < len(source):
+                print(f"{loc} Error: Unterminated Character literal.")
+                exit(1)
+
+            cur = source[pos]
+
+            if cur == "\\":
+                if not pos + 1 < len(source):
+                    print(f"{loc} Error: Unterminated Character literal.")
+                    exit(1)
+
+                pos = pos + 1
+                nxt = source[pos]
+
+                if nxt == "n":
+                    lexeme = str(ord("\n"))
+
+                elif nxt == "t":
+                    lexeme = str(ord("\t"))
+
+                elif nxt == "\'":
+                    lexeme = str(ord("\'"))
+
+                else:
+                    print(f"{loc.shift(1)} Error: Unrecognised Escape Sequence.")
+                    exit(1)
+
+            else:
+                lexeme = str(ord(cur))
+
+            pos = pos + 1
+            if not (pos < len(source) and source[pos] == "\'"):
+                print(f"{loc} Error: Unterminated Character literal.")
+                exit(1)
+
+            pos = pos + 1
+            tokens.append(Token(TokenType.NUMBER, lexeme, loc))
+
         elif char == "\"":
             pos, lexeme = lex_string(source, pos, loc)
             tokens.append(Token(TokenType.STRING, lexeme, loc))

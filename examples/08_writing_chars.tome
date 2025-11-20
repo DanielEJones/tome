@@ -1,20 +1,23 @@
--- "hello, world!"
-104     #  0 + write-ch
-101     #  1 + write-ch
-108     #  2 + write-ch
-108     #  3 + write-ch
-111     #  4 + write-ch
- 44     #  5 + write-ch
- 32     #  6 + write-ch
-119     #  7 + write-ch
-111     #  8 + write-ch
-114     #  9 + write-ch
-108     # 10 + write-ch
-100     # 11 + write-ch
- 33     # 12 + write-ch
+-- "'hello, world!'\n"
+'\''    #  0 + write-ch
+'h'     #  1 + write-ch
+'e'     #  2 + write-ch
+'l'     #  3 + write-ch
+'l'     #  4 + write-ch
+'o'     #  5 + write-ch
+','     #  6 + write-ch
+' '     #  7 + write-ch
+'w'     #  8 + write-ch
+'o'     #  9 + write-ch
+'r'     # 10 + write-ch
+'l'     # 11 + write-ch
+'d'     # 12 + write-ch
+'!'     # 13 + write-ch
+'\''    # 14 + write-ch
+'\n'    # 15 + write-ch
 
 -- write the codes out
- 0 while dup 13 < do
+ 0 while dup 16 < do
     dup # swap + read-ch .
     1 + ;
 
