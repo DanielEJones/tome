@@ -693,12 +693,14 @@ class Linux_x86_64(Backend):
 
         elif opcode is InstrType.BASEP:
             Backend._emit_all(file, [
+                f"; base-pointer",
                 f"    lea     rax, [rel heap_base]",
                 f"    push    rax",
             ])
 
         elif opcode is InstrType.WRITE:
             Backend._emit_all(file, [
+                f"; write",
                 f"    pop     rcx",
                 f"    pop     rax",
                 f"    mov     qword [rcx], rax",
@@ -706,6 +708,7 @@ class Linux_x86_64(Backend):
 
         elif opcode is InstrType.WCH:
             Backend._emit_all(file, [
+                f"; write-ch",
                 f"    pop     rcx",
                 f"    pop     rax",
                 f"    mov     byte [rcx], al",
@@ -713,6 +716,7 @@ class Linux_x86_64(Backend):
 
         elif opcode is InstrType.READ:
             Backend._emit_all(file, [
+                f"; read",
                 f"    pop     rcx",
                 f"    mov     rax, [rcx]",
                 f"    push    rax",
@@ -720,6 +724,7 @@ class Linux_x86_64(Backend):
 
         elif opcode is InstrType.RCH:
             Backend._emit_all(file, [
+                f"; read-ch",
                 f"    pop     rcx",
                 f"    movzx   rax, byte [rcx]",
                 f"    push rax",
