@@ -273,6 +273,7 @@ def lex_word(source: str, start: int) -> tuple[int, str]:
 
 class InstrType(IntEnum):
     PUSH_STR = auto()
+    SYSCALL = auto()
     SDUMP = auto()
     WRITE = auto()
     READ = auto()
@@ -311,6 +312,13 @@ class Instr:
 
 BUILTINS = {
     "<stack-dump>": Instr(InstrType.SDUMP),
+    "syscall0": Instr(InstrType.SYSCALL, 0),
+    "syscall1": Instr(InstrType.SYSCALL, 1),
+    "syscall2": Instr(InstrType.SYSCALL, 2),
+    "syscall3": Instr(InstrType.SYSCALL, 3),
+    "syscall4": Instr(InstrType.SYSCALL, 4),
+    "syscall5": Instr(InstrType.SYSCALL, 5),
+    "syscall6": Instr(InstrType.SYSCALL, 6),
     "write-ch": Instr(InstrType.WCH),
     "read-ch": Instr(InstrType.RCH),
     "write": Instr(InstrType.WRITE),
@@ -463,8 +471,8 @@ def parse_expression(tokens: list[Token], start: int) -> tuple[int, list[Instr]]
 
         # String literals push a pointer to their base and their length onto the stack
         elif token.typ is TokenType.STRING:
-            instrs.append(Instr(InstrType.PUSH_STR, sum(len(s) for s in STRINGS)))
             instrs.append(Instr(InstrType.PUSH, len(token.lexeme)))
+            instrs.append(Instr(InstrType.PUSH_STR, sum(len(s) for s in STRINGS)))
             STRINGS.append(token.lexeme)
             pos = pos + 1
 
@@ -705,7 +713,7 @@ class Linux_x86_64(Backend):
 
             "section .rodata",
             "str_table:",
-            *(f"    db \"{s}\"" for s in STRINGS),
+            *(f"    db {','.join(f'0x{b:02X}' for b in s.encode('utf-8'))}" for s in STRINGS),
 
             "section .text",
             "global _start",
@@ -747,7 +755,7 @@ class Linux_x86_64(Backend):
     def emit_instruction(file: TextIO, instruction: Instr) -> None:
         opcode, operand = instruction.opcode, instruction.operand
 
-        assert len(InstrType) == 29, "make sure to account for all instruction types"
+        assert len(InstrType) == 30, "make sure to account for all instruction types"
 
         if opcode is InstrType.PUSH:
             Backend._emit_all(file, [
@@ -967,6 +975,28 @@ class Linux_x86_64(Backend):
                 f"    xor     rdx, rdx",
                 f"    idiv    rbx",
                 f"    push    rdx",
+            ])
+
+        elif opcode is InstrType.SYSCALL:
+            if not isinstance(operand, int):
+                print("Compiler has failed, syscall arg should always be an int.")
+                exit(1)
+
+            Backend._emit_all(file, [
+                f"; syscall {operand}",
+                f"    pop     rax",
+            ])
+
+            if operand > 0: Backend._emit_all(file, [ f"    pop     rdi" ])
+            if operand > 1: Backend._emit_all(file, [ f"    pop     rsi" ])
+            if operand > 2: Backend._emit_all(file, [ f"    pop     rdx" ])
+            if operand > 3: Backend._emit_all(file, [ f"    pop     r10" ])
+            if operand > 4: Backend._emit_all(file, [ f"    pop     r8" ])
+            if operand > 5: Backend._emit_all(file, [ f"    pop     r9" ])
+
+            Backend._emit_all(file, [
+                f"    syscall",
+                f"    push    rax",
             ])
 
         elif opcode is InstrType.END:
