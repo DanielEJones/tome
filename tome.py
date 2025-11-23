@@ -1,9 +1,9 @@
-from enum import IntEnum, auto
-from os import close
-from typing import Type, IO
-from dataclasses import dataclass
 from sys import stdin, stdout, stderr
+from typing import Type, IO
 from subprocess import run
+
+from dataclasses import dataclass
+from enum import IntEnum, auto
 
 import argparse
 
@@ -702,6 +702,8 @@ def interpret(instructions: list[Instr]) -> None:
             elif call == 3:
                 fd, = args
                 files[fd].close()
+                # TODO: Don't just fake successful close
+                stack.append(0)
 
             # Exit
             elif call == 60:
@@ -1045,12 +1047,12 @@ class Linux_x86_64(Backend):
                 f"    pop     rax",
             ])
 
-            if operand > 0: Backend._emit_all(file, [ f"    pop     rdi" ])
-            if operand > 1: Backend._emit_all(file, [ f"    pop     rsi" ])
-            if operand > 2: Backend._emit_all(file, [ f"    pop     rdx" ])
-            if operand > 3: Backend._emit_all(file, [ f"    pop     r10" ])
-            if operand > 4: Backend._emit_all(file, [ f"    pop     r8" ])
-            if operand > 5: Backend._emit_all(file, [ f"    pop     r9" ])
+            if operand > 0: Backend._emit_all(file, [f"    pop     rdi"])
+            if operand > 1: Backend._emit_all(file, [f"    pop     rsi"])
+            if operand > 2: Backend._emit_all(file, [f"    pop     rdx"])
+            if operand > 3: Backend._emit_all(file, [f"    pop     r10"])
+            if operand > 4: Backend._emit_all(file, [f"    pop     r8"])
+            if operand > 5: Backend._emit_all(file, [f"    pop     r9"])
 
             Backend._emit_all(file, [
                 f"    syscall",
