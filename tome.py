@@ -347,7 +347,6 @@ def parse(tokens: list[Token]) -> list[Instr]:
         print(f"{last.loc} Error: Unexpected {last.typ.name} '{last.lexeme}'.")
         exit(1)
 
-    print(STRINGS)
     instrs.append(Instr(InstrType.END))
     return instrs
 

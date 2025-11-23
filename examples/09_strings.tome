@@ -1,15 +1,33 @@
-"hello, world!"     -- [ `base` `len` ]
-2nd swap +          -- [ `base` `base+len`
+-- -- The following is program listed out operation by operation and annotated
+-- -- with stack diagrams to aid in your understanding of program execution
+--
+-- -- Push the string to the stack
+-- "hello, world!"     -- [ `base` `len` ]
+--
+-- -- Replace the len with a pointer to the end so we
+-- -- can compare to that rather than maintaining an index
+-- 2nd swap +          -- [ `base` `base+len`
+-- while
+-- -- Check that the current pointer is less than the end
+--     2nd             -- [ `base` `base+len` `base` ]
+--     2nd             -- [ `base` `base+len` `base` `base+len` ]
+--     <               -- [ `base` `base+len` 1 ]
+-- do                  -- [ `base` `base+len` ]
+-- -- Read a character from the current pointer then print
+-- -- it's numeric value to the terminal
+--     swap            -- [ `base+len` `base` ]
+--     dup             -- [ `base+len` `base` `base` ]
+--     read-ch         -- [ `base+len` `base` 'h' ]
+--     .               -- [ `base+len` `base` ]
+-- -- Increment the pointer by one byte and set up for the
+-- -- next iteration of the loop
+--     1 +             -- [ `base+len` `base+1` ]
+--     swap            -- [ `base+1` `base+len` ]
+-- ;
 
-while
-    2nd             -- [ `base` `base+len` `base` ]
-    2nd             -- [ `base` `base+len` `base` `base+len` ]
-    <               -- [ `base` `base+len` 1 ]
-do                  -- [ `base` `base+len` ]
-    swap            -- [ `base+len` `base` ]
-    dup             -- [ `base+len` `base` `base` ]
-    read-ch         -- [ `base+len` `base` 'h' ]
-    .               -- [ `base+len` `base` ]
-    1 +             -- [ `base+len` `base+1` ]
-    swap            -- [ `base+1` `base+len` ]
-;
+"hello, world!"
+
+2nd swap +
+while 2nd 2nd < do
+    swap dup read-ch .
+    1 + swap;
