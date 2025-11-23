@@ -1,0 +1,15 @@
+"hello, world!"     -- [ `base` `len` ]
+2nd swap +          -- [ `base` `base+len`
+
+while
+    2nd             -- [ `base` `base+len` `base` ]
+    2nd             -- [ `base` `base+len` `base` `base+len` ]
+    <               -- [ `base` `base+len` 1 ]
+do                  -- [ `base` `base+len` ]
+    swap            -- [ `base+len` `base` ]
+    dup             -- [ `base+len` `base` `base` ]
+    read-ch         -- [ `base+len` `base` 'h' ]
+    .               -- [ `base+len` `base` ]
+    1 +             -- [ `base+len` `base+1` ]
+    swap            -- [ `base+1` `base+len` ]
+;

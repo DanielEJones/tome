@@ -272,6 +272,7 @@ def lex_word(source: str, start: int) -> tuple[int, str]:
 #
 
 class InstrType(IntEnum):
+    PUSH_STR = auto()
     SDUMP = auto()
     WRITE = auto()
     READ = auto()
@@ -335,6 +336,9 @@ BUILTINS = {
 }
 
 
+STRINGS: list[str] = []
+
+
 def parse(tokens: list[Token]) -> list[Instr]:
     pos, instrs = parse_expression(tokens, 0)
 
@@ -343,6 +347,7 @@ def parse(tokens: list[Token]) -> list[Instr]:
         print(f"{last.loc} Error: Unexpected {last.typ.name} '{last.lexeme}'.")
         exit(1)
 
+    print(STRINGS)
     instrs.append(Instr(InstrType.END))
     return instrs
 
@@ -457,6 +462,13 @@ def parse_expression(tokens: list[Token], start: int) -> tuple[int, list[Instr]]
             instrs.append(Instr(InstrType.PUSH, int(token.lexeme)))
             pos = pos + 1
 
+        # String literals push a pointer to their base and their length onto the stack
+        elif token.typ is TokenType.STRING:
+            instrs.append(Instr(InstrType.PUSH_STR, sum(len(s) for s in STRINGS)))
+            instrs.append(Instr(InstrType.PUSH, len(token.lexeme)))
+            STRINGS.append(token.lexeme)
+            pos = pos + 1
+
         # Anything that is none of the above is left to be handled
         # by the parent scope that called this function
         else:
@@ -496,6 +508,12 @@ def make_label() -> str:
 def interpret(instructions: list[Instr]) -> None:
     ip, stack, heap = 0, [], bytearray(1024 * 1024)
 
+    # Add all the strings to the heap
+    strings_end = 0
+    for string in STRINGS:
+        heap[strings_end:strings_end+len(string)] = string.encode('utf-8')
+        strings_end = strings_end + len(string)
+
     # Find all the labels in the program and
     # record their index so that the interpreter
     # can jump to them via this lookup table
@@ -506,7 +524,7 @@ def interpret(instructions: list[Instr]) -> None:
         if instr.opcode is InstrType.LABEL
     }
 
-    assert len(InstrType) == 28, "Make sure all instructions are handled as necessary."
+    assert len(InstrType) == 29, "Make sure all instructions are handled as necessary."
 
     while ip < len(instructions):
         instr = instructions[ip]
@@ -515,8 +533,11 @@ def interpret(instructions: list[Instr]) -> None:
         if instr.opcode is InstrType.PUSH:
             stack.append(instr.operand)
 
+        elif instr.opcode is InstrType.PUSH_STR:
+            stack.append(instr.operand)
+
         elif instr.opcode is InstrType.BASEP:
-            stack.append(0)
+            stack.append(strings_end)
 
         elif instr.opcode is InstrType.WRITE:
             address = stack.pop()
