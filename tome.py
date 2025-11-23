@@ -272,6 +272,7 @@ def lex_word(source: str, start: int) -> tuple[int, str]:
 #
 
 class InstrType(IntEnum):
+    PUSH_STR = auto()
     SDUMP = auto()
     WRITE = auto()
     READ = auto()
@@ -333,6 +334,9 @@ BUILTINS = {
     ".": Instr(InstrType.PRINT),
     "#": Instr(InstrType.BASEP),
 }
+
+
+STRINGS: list[str] = []
 
 
 def parse(tokens: list[Token]) -> list[Instr]:
@@ -457,6 +461,13 @@ def parse_expression(tokens: list[Token], start: int) -> tuple[int, list[Instr]]
             instrs.append(Instr(InstrType.PUSH, int(token.lexeme)))
             pos = pos + 1
 
+        # String literals push a pointer to their base and their length onto the stack
+        elif token.typ is TokenType.STRING:
+            instrs.append(Instr(InstrType.PUSH_STR, sum(len(s) for s in STRINGS)))
+            instrs.append(Instr(InstrType.PUSH, len(token.lexeme)))
+            STRINGS.append(token.lexeme)
+            pos = pos + 1
+
         # Anything that is none of the above is left to be handled
         # by the parent scope that called this function
         else:
@@ -496,6 +507,12 @@ def make_label() -> str:
 def interpret(instructions: list[Instr]) -> None:
     ip, stack, heap = 0, [], bytearray(1024 * 1024)
 
+    # Add all the strings to the heap
+    strings_end = 0
+    for string in STRINGS:
+        heap[strings_end:strings_end+len(string)] = string.encode('utf-8')
+        strings_end = strings_end + len(string)
+
     # Find all the labels in the program and
     # record their index so that the interpreter
     # can jump to them via this lookup table
@@ -506,7 +523,7 @@ def interpret(instructions: list[Instr]) -> None:
         if instr.opcode is InstrType.LABEL
     }
 
-    assert len(InstrType) == 28, "Make sure all instructions are handled as necessary."
+    assert len(InstrType) == 29, "Make sure all instructions are handled as necessary."
 
     while ip < len(instructions):
         instr = instructions[ip]
@@ -515,8 +532,11 @@ def interpret(instructions: list[Instr]) -> None:
         if instr.opcode is InstrType.PUSH:
             stack.append(instr.operand)
 
+        elif instr.opcode is InstrType.PUSH_STR:
+            stack.append(instr.operand)
+
         elif instr.opcode is InstrType.BASEP:
-            stack.append(0)
+            stack.append(strings_end)
 
         elif instr.opcode is InstrType.WRITE:
             address = stack.pop()
@@ -679,13 +699,17 @@ class Linux_x86_64(Backend):
     @staticmethod
     def begin(file: TextIO) -> None:
         Backend._emit_all(file, [
-            "global _start",
-            "global heap_base",
             "section .bss",
             "heap_base:",
             "    resb 1024*1024",
+
+            "section .rodata",
+            "str_table:",
+            *(f"    db \"{s}\"" for s in STRINGS),
+
             "section .text",
-            "_start:"
+            "global _start",
+            "_start:",
         ])
 
     @staticmethod
@@ -723,12 +747,19 @@ class Linux_x86_64(Backend):
     def emit_instruction(file: TextIO, instruction: Instr) -> None:
         opcode, operand = instruction.opcode, instruction.operand
 
-        assert len(InstrType) == 28, "make sure to account for all instruction types"
+        assert len(InstrType) == 29, "make sure to account for all instruction types"
 
         if opcode is InstrType.PUSH:
             Backend._emit_all(file, [
                 f"; {operand}",
                 f"    push    {operand}"
+            ])
+
+        elif opcode is InstrType.PUSH_STR:
+            Backend._emit_all(file, [
+                f"; str {operand}",
+                f"    lea     rax, [rel str_table+{operand}]",
+                f"    push    rax",
             ])
 
         elif opcode is InstrType.BASEP:
