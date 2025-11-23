@@ -5,7 +5,7 @@
 -- 420                      -- [ 420 ]
 -- 577                      -- [ 420 577 ]
 -- "test.txt\0" swap drop   -- [ 420 577 ptr ]
--- 2                        -- [ 420 577 ptr 2 ]
+-- 2                        -- [ 420 577 ptr OPEN ]
 -- syscall3                 -- [ fd ]
 --
 -- -- Write "Hello, World!\n" to the file
@@ -18,7 +18,7 @@
 -- .                        -- [ fd ]
 --
 -- -- Clos the file
--- 3                        -- [ fd 3 ]
+-- 3                        -- [ fd CLOSE ]
 -- syscall1                 -- [ res ]
 -- drop                     -- [  ]
 
