@@ -1,6 +1,8 @@
 from enum import IntEnum, auto
-from typing import Type, TextIO
+from os import close
+from typing import Type, IO
 from dataclasses import dataclass
+from sys import stdin, stdout, stderr
 from subprocess import run
 
 import argparse
@@ -198,6 +200,8 @@ def lex_char(source: str, start: int, loc: Loc) -> tuple[int, str]:
             lexeme = str(ord("\n"))
         elif nxt == "t":
             lexeme = str(ord("\t"))
+        elif nxt == "0":
+            lexeme = str(ord("\0"))
         elif nxt == "\'":
             lexeme = str(ord("\'"))
         else:
@@ -244,6 +248,8 @@ def lex_string(source: str, start: int, loc: Loc) -> tuple[int, str]:
                 string_content += "\n"
             elif next_ == "t":
                 string_content += "\t"
+            elif next_ == "0":
+                string_content += "\0"
             else:
                 print(f"{loc.shift(pos - start + 1)} Error: Unrecognised escape sequence.")
                 exit(1)
@@ -515,6 +521,9 @@ def make_label() -> str:
 def interpret(instructions: list[Instr]) -> None:
     ip, stack, heap = 0, [], bytearray(1024 * 1024)
 
+    files: dict[int, IO] = { 0: stdin, 1: stdout, 2: stderr }
+    next_file = 3
+
     # Add all the strings to the heap
     strings_end = 0
     for string in STRINGS:
@@ -531,7 +540,7 @@ def interpret(instructions: list[Instr]) -> None:
         if instr.opcode is InstrType.LABEL
     }
 
-    assert len(InstrType) == 29, "Make sure all instructions are handled as necessary."
+    assert len(InstrType) == 30, "Make sure all instructions are handled as necessary."
 
     while ip < len(instructions):
         instr = instructions[ip]
@@ -654,6 +663,55 @@ def interpret(instructions: list[Instr]) -> None:
             top = stack.pop()
             print(top)
 
+        elif instr.opcode is InstrType.SYSCALL:
+            if not isinstance(instr.operand, int):
+                print("Syscall operand must be an int.")
+                exit(1)
+
+            args = []
+            for _ in range(1 + instr.operand):
+                args.append(stack.pop())
+
+            call, *args = args
+
+            # Read
+            if call == 0:
+                fd, buf, l = args
+                data = files[fd].read(l)
+                heap[buf:buf+l] = data.encode("utf-8")
+                stack.append(len(data))
+
+            # Write
+            elif call == 1:
+                fd, buf, l = args
+                data = heap[buf:buf+l].decode("utf-8")
+                wrote = files[fd].write(data)
+                stack.append(wrote)
+
+            # Open
+            elif call == 2:
+                # TODO: Actually make flags and mode do something
+                ptr, flags, mode = args
+                name = heap[ptr:heap.find(0, ptr)].decode("utf-8")
+                file = open(name, "w")
+                files[next_file] = file
+                stack.append(next_file)
+                next_file = next_file + 1
+
+            # Close
+            elif call == 3:
+                fd, = args
+                files[fd].close()
+
+            # Exit
+            elif call == 60:
+                return
+
+            else:
+                print(f"Error: Unimplemented Syscall '{call}'.")
+                exit(1)
+
+
         elif instr.opcode is InstrType.SDUMP:
             print(stack)
 
@@ -674,29 +732,29 @@ def interpret(instructions: list[Instr]) -> None:
 
 class Backend:
     @staticmethod
-    def _emit_all(file: TextIO, strings: list[str]) -> None:
+    def _emit_all(file: IO, strings: list[str]) -> None:
         file.write("".join(line + "\n" for line in strings))
 
     @staticmethod
-    def begin(file: TextIO) -> None:
+    def begin(file: IO) -> None:
         """Emits assembly prelude"""
         _ = file
         raise NotImplementedError("Backend must be a derived class representing a target")
 
     @staticmethod
-    def end(file: TextIO) -> None:
+    def end(file: IO) -> None:
         """Emits assembly postlude"""
         _ = file
         raise NotImplementedError("Backend must be a derived class representing a target")
 
     @staticmethod
-    def emit_instruction(file: TextIO, instruction: Instr) -> None:
+    def emit_instruction(file: IO, instruction: Instr) -> None:
         """Emits a single instruction"""
         _, _ = file, instruction
         raise NotImplementedError("Backend must be a derived class representing a target")
 
 
-def gen_code(ir: list[Instr], backend: Type[Backend], file: TextIO) -> None:
+def gen_code(ir: list[Instr], backend: Type[Backend], file: IO) -> None:
     backend.begin(file)
     for instruction in ir:
         backend.emit_instruction(file, instruction)
@@ -705,7 +763,7 @@ def gen_code(ir: list[Instr], backend: Type[Backend], file: TextIO) -> None:
 
 class Linux_x86_64(Backend):
     @staticmethod
-    def begin(file: TextIO) -> None:
+    def begin(file: IO) -> None:
         Backend._emit_all(file, [
             "section .bss",
             "heap_base:",
@@ -721,7 +779,7 @@ class Linux_x86_64(Backend):
         ])
 
     @staticmethod
-    def end(file: TextIO) -> None:
+    def end(file: IO) -> None:
         Backend._emit_all(file, [
             "print:",
             "    sub     rsp, 32",
@@ -752,7 +810,7 @@ class Linux_x86_64(Backend):
         ])
 
     @staticmethod
-    def emit_instruction(file: TextIO, instruction: Instr) -> None:
+    def emit_instruction(file: IO, instruction: Instr) -> None:
         opcode, operand = instruction.opcode, instruction.operand
 
         assert len(InstrType) == 30, "make sure to account for all instruction types"

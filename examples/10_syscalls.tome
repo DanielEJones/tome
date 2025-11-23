@@ -1,3 +1,21 @@
--- len, buf, fd, wrtie
-"Hello, World!\n" 1 1 syscall3
-.
+-- Open a file for writing
+420                      -- [ 420 ]
+577                      -- [ 420 577 ]
+"test.txt\0" swap drop   -- [ 420 577 ptr ]
+2                        -- [ 420 577 ptr 2 ]
+syscall3                 -- [ fd ]
+
+-- Write "Hello, World!\n" to the file
+"Hello, World!\n"        -- [ fd len ptr ]
+3rd                      -- [ fd len ptr fd ]
+1                        -- [ fd len ptr fd WRITE ]
+syscall3                 -- [ fd written ]
+
+-- Print the amount of bytes written
+.                        -- [ fd ]
+
+-- Clos the file
+3                        -- [ fd 3 ]
+syscall1                 -- [ res ]
+drop                     -- [  ]
+
