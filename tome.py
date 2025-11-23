@@ -699,13 +699,17 @@ class Linux_x86_64(Backend):
     @staticmethod
     def begin(file: TextIO) -> None:
         Backend._emit_all(file, [
-            "global _start",
-            "global heap_base",
             "section .bss",
             "heap_base:",
             "    resb 1024*1024",
+
+            "section .rodata",
+            "str_table:",
+            *(f"    db \"{s}\"" for s in STRINGS),
+
             "section .text",
-            "_start:"
+            "global _start",
+            "_start:",
         ])
 
     @staticmethod
@@ -743,12 +747,19 @@ class Linux_x86_64(Backend):
     def emit_instruction(file: TextIO, instruction: Instr) -> None:
         opcode, operand = instruction.opcode, instruction.operand
 
-        assert len(InstrType) == 28, "make sure to account for all instruction types"
+        assert len(InstrType) == 29, "make sure to account for all instruction types"
 
         if opcode is InstrType.PUSH:
             Backend._emit_all(file, [
                 f"; {operand}",
                 f"    push    {operand}"
+            ])
+
+        elif opcode is InstrType.PUSH_STR:
+            Backend._emit_all(file, [
+                f"; str {operand}",
+                f"    lea     rax, [rel str_table+{operand}]",
+                f"    push    rax",
             ])
 
         elif opcode is InstrType.BASEP:
