@@ -765,6 +765,9 @@ def interpret(instructions: list[Instr]) -> None:
             print(f"Error: unhandled opcode {instr.opcode.name}")
             exit(1)
 
+        # print(instr.opcode.name, ret_stack, val_stack, heap[0:40], end="")
+        # input()
+
     print(f"Error: The instructions provided never called END. This should not happen.")
     exit(1)
 

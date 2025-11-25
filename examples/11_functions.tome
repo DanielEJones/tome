@@ -1,24 +1,48 @@
-def print is
-    1 1 syscall3 drop;
+-- TODO: Need a way to make defs like this inline-able
+def WRITE   is 1;
+def STDOUT  is 1;
 
-def println is
-    swap    -- [ str len ]
-    0       -- [ str len i ]
+def print
+-- [ str: ptr len: int ] => [ ]
+is STDOUT WRITE syscall3 drop;
 
-    -- Write the original string into the buffer
-    while 2nd 2nd > do
-        3rd 2nd + read-ch       -- [ str len i ch ]
-        2nd # +                 -- [ str len i ch buf+i ]
-        write-ch                -- [ str len i ]
-        1 + ;
+def memcpy
+-- [ src:ptr dest:ptr len:int ] => [ ]
+is
+    1 while do
+        -- Move back one byte
+        1 -             -- [ src dest len-1 ]
 
-    -- Write a newline to the end of the string
-    # + '\n' swap               -- [ str len '\n' buf+i ]
-    write-ch                    -- [ str len ]
+        -- Read one byte from the source
+        3rd 2nd +       -- [ src dest len-1 src+len-1 ]
+        read-ch         -- [ src dest len-1 b ]
 
-    -- Print the buffer, which is one character longer
-    1 + # print                 -- [ str ]
-    drop;
+        -- Write the byte into the destination
+        3rd 3rd +       -- [ src dest len-1 b dest+len-1 ]
+        write-ch        -- [ src dest len-1 ]
+
+        -- Push a flag that indicates whether we continue
+        dup 0 = not;
+
+    -- Drop all the things we were working with
+    drop drop drop ;
+
+def println
+-- [ str:ptr len:int ] => [ ]
+is
+    -- Copy the source string into a buffer
+    #               -- [ len str # ]
+    3rd             -- [ len str # len ]
+    memcpy          -- [ len ]
+
+    -- Append a newline to the buffer
+    dup # +         -- [ len buf+len ]
+    '\n' swap       -- [ len '\n' buf+len ]
+    write-ch        -- [ len ]
+
+    -- Print the buffer, which is one letter longer
+    1 + #           -- [ len+1 buf ]
+    print ;
 
 def main is
     "Hello, World!"     println
