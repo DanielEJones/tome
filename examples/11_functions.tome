@@ -2,9 +2,11 @@
 def WRITE   is 1;
 def STDOUT  is 1;
 
+
 def print
 -- [ str: ptr len: int ] => [ ]
 is STDOUT WRITE syscall3 drop;
+
 
 def memcpy
 -- [ src:ptr dest:ptr len:int ] => [ ]
@@ -27,6 +29,7 @@ is
     -- Drop all the things we were working with
     drop drop drop ;
 
+
 def println
 -- [ str:ptr len:int ] => [ ]
 is
@@ -44,6 +47,40 @@ is
     1 + #           -- [ len+1 buf ]
     print ;
 
+
+def print_int is
+    -- Pointer to the end of the buffer
+    # 33 +
+
+    -- Write a newline to the end of the buffer
+    '\n' 2nd write-ch
+    1 -
+
+    1 while do
+        -- Get the current digit as a char
+        2nd 10 % '0' +
+
+        -- Write it to the buffer
+        2nd write-ch
+
+        -- Move the buffer back by one
+        1 -
+
+        -- Shift n down one digit
+        swap 10 /
+        swap
+
+        -- If n is currently 0, halt, else continue
+        2nd 0 = not ;
+
+    -- Calculate the length
+    # 33 + 2nd - 1 +
+
+    swap            -- [ n len buf ]
+    1 1 syscall3 ;
+
+
 def main is
     "Hello, World!"     println
-    "Goodbye now."      println ;
+    "Goodbye now."      println
+    1234567890          print_int ;

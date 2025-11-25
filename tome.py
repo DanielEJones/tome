@@ -812,6 +812,8 @@ class Linux_x86_64(Backend):
     def begin(file: IO) -> None:
         Backend._emit_all(file, [
             "section .bss",
+            "stack_base:",
+            "    resb 1024",
             "heap_base:",
             "    resb 1024*1024",
 
@@ -822,12 +824,13 @@ class Linux_x86_64(Backend):
             "section .text",
             "global _start",
             "_start:",
+            "    mov r15, stack_base",
         ])
 
     @staticmethod
     def end(file: IO) -> None:
         Backend._emit_all(file, [
-            "print:",
+            "_dot_op:",
             "    sub     rsp, 32",
             "    mov     rsi, rsp",
             "    mov     byte [rsi + 31], 10",
@@ -859,7 +862,7 @@ class Linux_x86_64(Backend):
     def emit_instruction(file: IO, instruction: Instr) -> None:
         opcode, operand = instruction.opcode, instruction.operand
 
-        assert len(InstrType) == 30, "make sure to account for all instruction types"
+        assert len(InstrType) == 32, "make sure to account for all instruction types"
 
         if opcode is InstrType.PUSH:
             Backend._emit_all(file, [
@@ -1021,6 +1024,25 @@ class Linux_x86_64(Backend):
                 f"    je      {operand}"
             ])
 
+        elif opcode is InstrType.CALL:
+            l = make_label()
+            Backend._emit_all(file, [
+                f"; call",
+                f"    lea     rax, [rel {l}]",
+                f"    mov     [r15], rax",
+                f"    add     r15, 8",
+                f"    jmp     {operand}",
+                f"{l}:"
+            ])
+
+        elif opcode is InstrType.RET:
+            Backend._emit_all(file, [
+                f"; ret",
+                f"    sub r15, 8",
+                f"    mov rax, [r15]",
+                f"    jmp rax",
+            ])
+
         elif opcode is InstrType.JMP:
             Backend._emit_all(file, [
                 f"; jmp",
@@ -1031,7 +1053,7 @@ class Linux_x86_64(Backend):
             Backend._emit_all(file, [
                 f"; print",
                 f"    pop     rdi",
-                f"    call    print"
+                f"    call    _dot_op"
             ])
 
         elif opcode is InstrType.ADD:
