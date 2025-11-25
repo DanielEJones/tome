@@ -36,11 +36,12 @@
 -- ;
 
 
-20
+def fizz-buzz is
+    1 while dup 3rd < do
+        if      dup 3 % 0 = 2nd 5 % 0 = and then 'z' .
+        else-if dup 3 % 0 =                 then 'f'.
+        else-if dup 5 % 0 =                 then 'b' .
+                                            else dup . ;
+        1 + ;;
 
-1 while dup 3rd < do
-    if      dup 3 % 0 = 2nd 5 % 0 = and then 'z' .
-    else-if dup 3 % 0 =                 then 'f'.
-    else-if dup 5 % 0 =                 then 'b' .
-                                        else dup . ;
-    1 + ;
+def main is 20 fizz-buzz;

@@ -25,9 +25,12 @@
 --     swap            -- [ `base+1` `base+len` ]
 -- ;
 
-"hello, world!"
 
-swap 2nd +
-while 2nd 2nd < do
-    swap dup read-ch .
-    1 + swap;
+def print-each-char is
+    swap 2nd +
+    while 2nd 2nd < do
+        swap dup read-ch .
+        1 + swap ;;
+
+def main is
+    "hello, world!" print-each-char ;

@@ -35,8 +35,10 @@
 --     .       -- branch has already been taken
 -- ;
 
-6
 
-if      dup 5 < then 'l' .
-else-if dup 5 > then 'g' .
-                else 'e' . ;
+def main is
+    6
+
+    if      dup 5 < then 'l' .
+    else-if dup 5 > then 'g' .
+                    else 'e' . ;;

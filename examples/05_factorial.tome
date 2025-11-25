@@ -46,13 +46,13 @@
 -- .               -- [ ]
 
 
-6
+def fact is
+    if dup 1 > then
+        0 swap
+        while dup 1 > do dup 1 - ;
+        while 2nd do *;
+        swap drop
+    else 1;;
 
-if dup 1 > then
-    0 swap
-    while dup 1 > do dup 1 - ;
-    while 2nd do *;
-    swap drop
-else 1;
-
-.
+def main is
+    6 fact . ;

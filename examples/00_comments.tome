@@ -1,2 +1,2 @@
 -- this is a comment, and it goes to the end of the line
-2 -- comments can also be inline
+def main is 2; -- comments can also be inline

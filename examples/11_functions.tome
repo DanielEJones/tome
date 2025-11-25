@@ -1,0 +1,86 @@
+-- TODO: Need a way to make defs like this inline-able
+def WRITE   is 1;
+def STDOUT  is 1;
+
+
+def print
+-- [ str: ptr len: int ] => [ ]
+is STDOUT WRITE syscall3 drop;
+
+
+def memcpy
+-- [ src:ptr dest:ptr len:int ] => [ ]
+is
+    1 while do
+        -- Move back one byte
+        1 -             -- [ src dest len-1 ]
+
+        -- Read one byte from the source
+        3rd 2nd +       -- [ src dest len-1 src+len-1 ]
+        read-ch         -- [ src dest len-1 b ]
+
+        -- Write the byte into the destination
+        3rd 3rd +       -- [ src dest len-1 b dest+len-1 ]
+        write-ch        -- [ src dest len-1 ]
+
+        -- Push a flag that indicates whether we continue
+        dup 0 = not;
+
+    -- Drop all the things we were working with
+    drop drop drop ;
+
+
+def println
+-- [ str:ptr len:int ] => [ ]
+is
+    -- Copy the source string into a buffer
+    #               -- [ len str # ]
+    3rd             -- [ len str # len ]
+    memcpy          -- [ len ]
+
+    -- Append a newline to the buffer
+    dup # +         -- [ len buf+len ]
+    '\n' swap       -- [ len '\n' buf+len ]
+    write-ch        -- [ len ]
+
+    -- Print the buffer, which is one letter longer
+    1 + #           -- [ len+1 buf ]
+    print ;
+
+
+def print_int is
+    -- Pointer to the end of the buffer
+    # 33 +
+
+    -- Write a newline to the end of the buffer
+    '\n' 2nd write-ch
+    1 -
+
+    1 while do
+        -- Get the current digit as a char
+        2nd 10 % '0' +
+
+        -- Write it to the buffer
+        2nd write-ch
+
+        -- Move the buffer back by one
+        1 -
+
+        -- Shift n down one digit
+        swap 10 /
+        swap
+
+        -- If n is currently 0, halt, else continue
+        2nd 0 = not ;
+
+    -- Calculate the length
+    # 33 + 2nd - 1 +
+
+    swap            -- [ n len buf ]
+    1 1 syscall3 ;
+
+
+def main is
+    "Hello, World!"     println
+    "Goodbye now."      println
+    1234567890          print_int ;
