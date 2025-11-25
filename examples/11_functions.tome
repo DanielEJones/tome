@@ -1,0 +1,25 @@
+def print is
+    1 1 syscall3 drop;
+
+def println is
+    swap    -- [ str len ]
+    0       -- [ str len i ]
+
+    -- Write the original string into the buffer
+    while 2nd 2nd > do
+        3rd 2nd + read-ch       -- [ str len i ch ]
+        2nd # +                 -- [ str len i ch buf+i ]
+        write-ch                -- [ str len i ]
+        1 + ;
+
+    -- Write a newline to the end of the string
+    # + '\n' swap               -- [ str len '\n' buf+i ]
+    write-ch                    -- [ str len ]
+
+    -- Print the buffer, which is one character longer
+    1 + # print                 -- [ str ]
+    drop;
+
+def main is
+    "Hello, World!"     println
+    "Goodbye now."      println ;

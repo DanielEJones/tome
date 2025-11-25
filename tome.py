@@ -307,6 +307,8 @@ class InstrType(IntEnum):
     LABEL = auto()
     JMPF = auto()
     JMP = auto()
+    CALL = auto()
+    RET = auto()
     END = auto()
 
 
@@ -354,15 +356,34 @@ STRINGS: list[str] = []
 
 
 def parse(tokens: list[Token]) -> list[Instr]:
-    pos, instrs = parse_expression(tokens, 0)
+    pos, instrs = 0, []
 
-    last = tokens[pos]
-    if last.typ is not TokenType.EOF:
-        print(f"{last.loc} Error: Unexpected {last.typ.name} '{last.lexeme}'.")
-        exit(1)
-
+    # We jump in to the main function, then we end
+    instrs.append(Instr(InstrType.CALL, "main"))
     instrs.append(Instr(InstrType.END))
+
+    while pos < len(tokens) and tokens[pos].typ is not TokenType.EOF:
+        pos, defn = parse_def(tokens, pos)
+        instrs.extend(defn)
+
     return instrs
+
+
+def parse_def(tokens: list[Token], start: int) -> tuple[int, list[Instr]]:
+    pos, instrs = start, []
+
+    pos = expect_keyword("def", tokens, pos)
+    pos, name = expect_word(tokens, pos)
+    instrs.append(Instr(InstrType.LABEL, name))
+
+    pos = expect_keyword("is", tokens, pos)
+    pos, body = parse_expression(tokens, pos)
+    instrs.extend(body)
+
+    pos = expect_keyword(";", tokens, pos)
+    instrs.append(Instr(InstrType.RET))
+
+    return pos, instrs
 
 
 def parse_expression(tokens: list[Token], start: int) -> tuple[int, list[Instr]]:
@@ -380,8 +401,8 @@ def parse_expression(tokens: list[Token], start: int) -> tuple[int, list[Instr]]
 
         # Non builtin words can be handled by a call instruction
         elif token.typ is TokenType.WORD:
-            print(f"{token.loc} Error: User-defined words are currently unsupported: Unknown word '{token.lexeme}'.")
-            exit(1)
+            instrs.append(Instr(InstrType.CALL, token.lexeme))
+            pos = pos + 1
 
         # IF ::= 'if' <exp> 'then' <exp> ('else-if' <exp> 'then' <exp>)* ('else' <exp>)? ';'
         elif token.typ is TokenType.KEY_WORD and token.lexeme == "if":
@@ -503,6 +524,19 @@ def expect_keyword(lexeme: str, tokens: list[Token], index: int) -> int:
     return index + 1
 
 
+def expect_word(tokens: list[Token], index: int) -> tuple[int, str]:
+    if not index < len(tokens):
+        print(f"{tokens[-1].loc} Error: expected WORD but got nothing.")
+        exit(1)
+
+    token = tokens[index]
+    if token.typ is not TokenType.WORD:
+        print(f"{token.loc} Error: Expected WORD but got {token.typ.name} '{token.lexeme}' instead.")
+        exit(1)
+
+    return index + 1, token.lexeme
+
+
 LABEL = 0
 
 
@@ -519,7 +553,8 @@ def make_label() -> str:
 #
 
 def interpret(instructions: list[Instr]) -> None:
-    ip, stack, heap = 0, [], bytearray(1024 * 1024)
+    ip, heap = 0, bytearray(1024 * 1024)
+    val_stack, ret_stack = [], []
 
     files: dict[int, IO] = { 0: stdin, 1: stdout, 2: stderr }
     next_file = 3
@@ -540,127 +575,134 @@ def interpret(instructions: list[Instr]) -> None:
         if instr.opcode is InstrType.LABEL
     }
 
-    assert len(InstrType) == 30, "Make sure all instructions are handled as necessary."
+    assert len(InstrType) == 32, "Make sure all instructions are handled as necessary."
 
     while ip < len(instructions):
         instr = instructions[ip]
         ip = ip + 1
 
         if instr.opcode is InstrType.PUSH:
-            stack.append(instr.operand)
+            val_stack.append(instr.operand)
 
         elif instr.opcode is InstrType.PUSH_STR:
-            stack.append(instr.operand)
+            val_stack.append(instr.operand)
 
         elif instr.opcode is InstrType.BASEP:
-            stack.append(strings_end)
+            val_stack.append(strings_end)
 
         elif instr.opcode is InstrType.WRITE:
-            address = stack.pop()
-            value: int = stack.pop()
+            address = val_stack.pop()
+            value: int = val_stack.pop()
             heap[address:address+8] = value.to_bytes(8, "little")
 
         elif instr.opcode is InstrType.READ:
-            address = stack.pop()
+            address = val_stack.pop()
             value: int = int.from_bytes(heap[address:address+8], "little")
-            stack.append(value)
+            val_stack.append(value)
 
         elif instr.opcode is InstrType.WCH:
-            address = stack.pop()
-            value: int = stack.pop()
+            address = val_stack.pop()
+            value: int = val_stack.pop()
             heap[address:address+1] = value.to_bytes(1, "little")
 
         elif instr.opcode is InstrType.RCH:
-            address = stack.pop()
+            address = val_stack.pop()
             value: int = int.from_bytes(heap[address:address+1], "little")
-            stack.append(value)
+            val_stack.append(value)
 
         elif instr.opcode is InstrType.ADD:
-            right = stack.pop()
-            left = stack.pop()
-            stack.append(left + right)
+            right = val_stack.pop()
+            left = val_stack.pop()
+            val_stack.append(left + right)
 
         elif instr.opcode is InstrType.SUB:
-            right = stack.pop()
-            left = stack.pop()
-            stack.append(left - right)
+            right = val_stack.pop()
+            left = val_stack.pop()
+            val_stack.append(left - right)
 
         elif instr.opcode is InstrType.MUL:
-            right = stack.pop()
-            left = stack.pop()
-            stack.append(left * right)
+            right = val_stack.pop()
+            left = val_stack.pop()
+            val_stack.append(left * right)
 
         elif instr.opcode is InstrType.DIV:
-            right = stack.pop()
-            left = stack.pop()
-            stack.append(left // right)
+            right = val_stack.pop()
+            left = val_stack.pop()
+            val_stack.append(left // right)
 
         elif instr.opcode is InstrType.MOD:
-            right = stack.pop()
-            left = stack.pop()
-            stack.append(left % right)
+            right = val_stack.pop()
+            left = val_stack.pop()
+            val_stack.append(left % right)
 
         elif instr.opcode is InstrType.NOT:
-            top = stack.pop()
-            stack.append(int(not top))
+            top = val_stack.pop()
+            val_stack.append(int(not top))
 
         elif instr.opcode is InstrType.AND:
-            left = stack.pop()
-            right = stack.pop()
-            stack.append(int(left and right))
+            left = val_stack.pop()
+            right = val_stack.pop()
+            val_stack.append(int(left and right))
 
         elif instr.opcode is InstrType.OR:
-            left = stack.pop()
-            right = stack.pop()
-            stack.append(int(left or right))
+            left = val_stack.pop()
+            right = val_stack.pop()
+            val_stack.append(int(left or right))
 
         elif instr.opcode is InstrType.EQ:
-            right = stack.pop()
-            left = stack.pop()
-            stack.append(int(left == right))
+            right = val_stack.pop()
+            left = val_stack.pop()
+            val_stack.append(int(left == right))
 
         elif instr.opcode is InstrType.LT:
-            right = stack.pop()
-            left = stack.pop()
-            stack.append(int(left < right))
+            right = val_stack.pop()
+            left = val_stack.pop()
+            val_stack.append(int(left < right))
 
         elif instr.opcode is InstrType.GT:
-            right = stack.pop()
-            left = stack.pop()
-            stack.append(int(left > right))
+            right = val_stack.pop()
+            left = val_stack.pop()
+            val_stack.append(int(left > right))
 
         elif instr.opcode is InstrType.SWAP:
-            top = stack.pop()
-            snd = stack.pop()
-            stack.append(top)
-            stack.append(snd)
+            top = val_stack.pop()
+            snd = val_stack.pop()
+            val_stack.append(top)
+            val_stack.append(snd)
 
         elif instr.opcode is InstrType.DROP:
-            _ = stack.pop()
+            _ = val_stack.pop()
 
         elif instr.opcode is InstrType.DUP:
-            top = stack[-1]
-            stack.append(top)
+            top = val_stack[-1]
+            val_stack.append(top)
 
         elif instr.opcode is InstrType.SND:
-            stack.append(stack[-2])
+            val_stack.append(val_stack[-2])
 
         elif instr.opcode is InstrType.TRD:
-            stack.append(stack[-3])
+            val_stack.append(val_stack[-3])
 
         elif instr.opcode is InstrType.LABEL:
             pass
 
         elif instr.opcode is InstrType.JMPF:
-            top = stack.pop()
+            top = val_stack.pop()
             if top == 0:
                 ip = jump_table[instr.operand]
 
         elif instr.opcode is InstrType.JMP:
             ip = jump_table[instr.operand]
 
+        elif instr.opcode is InstrType.CALL:
+            ret_stack.append(ip)
+            ip = jump_table[instr.operand]
+
+        elif instr.opcode is InstrType.RET:
+            ip = ret_stack.pop()
+
         elif instr.opcode is InstrType.PRINT:
-            top = stack.pop()
+            top = val_stack.pop()
             print(top)
 
         elif instr.opcode is InstrType.SYSCALL:
@@ -670,7 +712,7 @@ def interpret(instructions: list[Instr]) -> None:
 
             args = []
             for _ in range(1 + instr.operand):
-                args.append(stack.pop())
+                args.append(val_stack.pop())
 
             call, *args = args
 
@@ -679,14 +721,14 @@ def interpret(instructions: list[Instr]) -> None:
                 fd, buf, l = args
                 data = files[fd].read(l)
                 heap[buf:buf+l] = data.encode("utf-8")
-                stack.append(len(data))
+                val_stack.append(len(data))
 
             # Write
             elif call == 1:
                 fd, buf, l = args
                 data = heap[buf:buf+l].decode("utf-8")
                 wrote = files[fd].write(data)
-                stack.append(wrote)
+                val_stack.append(wrote)
 
             # Open
             elif call == 2:
@@ -695,7 +737,7 @@ def interpret(instructions: list[Instr]) -> None:
                 name = heap[ptr:heap.find(0, ptr)].decode("utf-8")
                 file = open(name, "w")
                 files[next_file] = file
-                stack.append(next_file)
+                val_stack.append(next_file)
                 next_file = next_file + 1
 
             # Close
@@ -703,7 +745,7 @@ def interpret(instructions: list[Instr]) -> None:
                 fd, = args
                 files[fd].close()
                 # TODO: Don't just fake successful close
-                stack.append(0)
+                val_stack.append(0)
 
             # Exit
             elif call == 60:
@@ -713,9 +755,8 @@ def interpret(instructions: list[Instr]) -> None:
                 print(f"Error: Unimplemented Syscall '{call}'.")
                 exit(1)
 
-
         elif instr.opcode is InstrType.SDUMP:
-            print(stack)
+            print(val_stack)
 
         elif instr.opcode is InstrType.END:
             return
