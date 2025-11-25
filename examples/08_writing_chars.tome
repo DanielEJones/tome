@@ -1,23 +1,27 @@
--- "'hello, world!'\n"
-'\''    #  0 + write-ch
-'h'     #  1 + write-ch
-'e'     #  2 + write-ch
-'l'     #  3 + write-ch
-'l'     #  4 + write-ch
-'o'     #  5 + write-ch
-','     #  6 + write-ch
-' '     #  7 + write-ch
-'w'     #  8 + write-ch
-'o'     #  9 + write-ch
-'r'     # 10 + write-ch
-'l'     # 11 + write-ch
-'d'     # 12 + write-ch
-'!'     # 13 + write-ch
-'\''    # 14 + write-ch
-'\n'    # 15 + write-ch
+def write-message is
+    '\''    #  0 + write-ch
+    'h'     #  1 + write-ch
+    'e'     #  2 + write-ch
+    'l'     #  3 + write-ch
+    'l'     #  4 + write-ch
+    'o'     #  5 + write-ch
+    ','     #  6 + write-ch
+    ' '     #  7 + write-ch
+    'w'     #  8 + write-ch
+    'o'     #  9 + write-ch
+    'r'     # 10 + write-ch
+    'l'     # 11 + write-ch
+    'd'     # 12 + write-ch
+    '!'     # 13 + write-ch
+    '\''    # 14 + write-ch
+    '\n'    # 15 + write-ch ;
 
--- write the codes out
- 0 while dup 16 < do
-    dup # swap + read-ch .
-    1 + ;
+def read-message is
+    0 while dup 16 < do
+       dup # swap + read-ch .
+       1 + ;;
+
+def main is
+    write-message
+    read-message ;
 

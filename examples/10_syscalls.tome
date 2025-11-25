@@ -23,12 +23,19 @@
 -- drop                     -- [  ]
 
 
-420 577
-"test.txt\0" swap drop
-2 syscall3
+def open-file is
+    swap drop   -- [ ptr ]
+    420 swap    -- [ 420 ptr ]
+    577 swap    -- [ 420 577 ptr ]
+    2 syscall3 ;
 
-"Hello, World!\n" 3rd 1 syscall3 .
+def write-file is
+    1 syscall3 . ;
 
-3 syscall1
+def close-file is
+    3 syscall1 ;
 
-drop
+def main is
+    "my_file.txt\0"     open-file
+    "Hello, World!\n"   3rd write-file
+    close-file drop ;

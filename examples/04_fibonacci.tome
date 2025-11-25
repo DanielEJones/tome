@@ -24,6 +24,7 @@
 -- -- Then continue
 -- ;
 
-0 1 while dup 100 < do
-    dup .
-    swap 2nd + ;
+def main is
+    0 1 while dup 100 < do
+        dup .
+        swap 2nd + ;;

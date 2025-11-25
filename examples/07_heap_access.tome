@@ -34,9 +34,11 @@
 --     write   -- [ ]
 -- ;
 
-0 # 8 + write
 
-while # 8 + read dup 10 < do
-    dup . 1 +
-    # 8 + write;
+def main is
+    0 # 8 + write
+
+    while # 8 + read dup 10 < do
+        dup . 1 +
+        # 8 + write ;;
 

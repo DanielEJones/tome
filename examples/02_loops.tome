@@ -24,5 +24,6 @@
 -- ;
 
 
-1 while dup 10 < do
-    dup . 1 + ;
+def main is
+    1 while dup 10 < do
+        dup . 1 + ;;
