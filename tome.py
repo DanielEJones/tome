@@ -79,7 +79,7 @@ class Loc:
         return Loc(self.file, self.row, self.col + d)
 
     def __repr__(self) -> str:
-        return f"[{self.file} @ {self.row}:{self.col}]"
+        return f"[{self.file} @ {self.row:02d}:{self.col:02d}]"
 
 
 @dataclass
@@ -412,7 +412,7 @@ def parse(tokens: list[Token]) -> list[Instr]:
                 loc = locations[0]
                 print(f"{loc} Error: The word '{name}' is never defined.")
             else:
-                print(f"Error: The word '{name}' is never defined.")
+                print(f"Error: The word '{name}' is never defined:")
                 for loc in locations:
                     print(f"{loc} Note: '{name}' is used here.")
 
