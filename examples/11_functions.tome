@@ -4,7 +4,7 @@ def STDOUT  is 1;
 
 
 def print
--- [ str: ptr len: int ] => [ ]
+-- [ len:int str:ptr ] => [ ]
 is STDOUT WRITE syscall3 drop;
 
 
@@ -48,7 +48,7 @@ is
     print ;
 
 
-def print_int is
+def print-int is
     -- Pointer to the end of the buffer
     # 33 +
 
@@ -83,4 +83,4 @@ def print_int is
 def main is
     "Hello, World!"     println
     "Goodbye now."      println
-    1234567890          print_int ;
+    1234567890          print-int ;

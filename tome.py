@@ -354,17 +354,69 @@ BUILTINS = {
 
 STRINGS: list[str] = []
 
+# We use these to track functions, as well as manage any instances of
+# use-before-declaration to ensure we don't call an undefined function
+FUNCTION_MAP: dict[str, str] = {}
+AWAITING_DEF: dict[str, list[Loc]] = {}
+
+
+def get_function_label(name: str, loc: Loc) -> str:
+    if name in FUNCTION_MAP:
+        label = FUNCTION_MAP[name]
+    else:
+        label = make_label()
+        FUNCTION_MAP[name] = label
+        AWAITING_DEF[name] = []
+
+    if name in AWAITING_DEF:
+        AWAITING_DEF[name].append(loc)
+
+    return label
+
+
+def define_function(name: str) -> str:
+    if name in FUNCTION_MAP:
+        label = FUNCTION_MAP[name]
+    else:
+        label = make_label()
+        FUNCTION_MAP[name] = label
+
+    if name in AWAITING_DEF:
+        AWAITING_DEF.pop(name)
+
+    return label
+
 
 def parse(tokens: list[Token]) -> list[Instr]:
     pos, instrs = 0, []
 
-    # We jump in to the main function, then we end
-    instrs.append(Instr(InstrType.CALL, "main"))
+    # Set up the main label
+    main_label = get_function_label("main", tokens[-1].loc)
+
+    # Use the main function as the entry point
+    instrs.append(Instr(InstrType.CALL, main_label))
     instrs.append(Instr(InstrType.END))
 
     while pos < len(tokens) and tokens[pos].typ is not TokenType.EOF:
         pos, defn = parse_def(tokens, pos)
         instrs.extend(defn)
+
+    if "main" in AWAITING_DEF:
+        print("Error: Program does not define an entry point. Please define the word 'main'.")
+
+    if len(AWAITING_DEF) != 0:
+        for name, locations in AWAITING_DEF.items():
+            if name == "main": continue
+
+            if len(locations) == 1:
+                loc = locations[0]
+                print(f"{loc} Error: The word '{name}' is never defined.")
+            else:
+                print(f"Error: The word '{name}' is never defined.")
+                for loc in locations:
+                    print(f"{loc} Note: '{name}' is used here.")
+
+        exit(1)
 
     return instrs
 
@@ -373,8 +425,10 @@ def parse_def(tokens: list[Token], start: int) -> tuple[int, list[Instr]]:
     pos, instrs = start, []
 
     pos = expect_keyword("def", tokens, pos)
+
     pos, name = expect_word(tokens, pos)
-    instrs.append(Instr(InstrType.LABEL, name))
+    label = define_function(name)
+    instrs.append(Instr(InstrType.LABEL, label))
 
     pos = expect_keyword("is", tokens, pos)
     pos, body = parse_expression(tokens, pos)
@@ -401,7 +455,8 @@ def parse_expression(tokens: list[Token], start: int) -> tuple[int, list[Instr]]
 
         # Non builtin words can be handled by a call instruction
         elif token.typ is TokenType.WORD:
-            instrs.append(Instr(InstrType.CALL, token.lexeme))
+            label = get_function_label(token.lexeme, token.loc)
+            instrs.append(Instr(InstrType.CALL, label))
             pos = pos + 1
 
         # IF ::= 'if' <exp> 'then' <exp> ('else-if' <exp> 'then' <exp>)* ('else' <exp>)? ';'
