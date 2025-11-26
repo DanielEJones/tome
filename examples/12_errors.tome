@@ -4,9 +4,13 @@ def some-func is
     1 2 + 3 * 6 / .
     other-func
 --  ^~~~~~~~~~~~~~ Should have a note pointing here ...
-    third-func ;
+    third-func fourth-func ;
 --  ^~~~~~~~~~~~~~ ... and a note pointing here ...
 
 def main is
     some-func other-func ;
 --            ^~~~ ... and a note pointing here.
+
+def fourth-func is
+    4 . ;
+
