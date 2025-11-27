@@ -1,6 +1,6 @@
-from sys import stdin, stdout, stderr
 from typing import Type, IO
 from subprocess import run
+import os
 
 from dataclasses import dataclass
 from enum import IntEnum, auto
@@ -94,7 +94,12 @@ SPACE_CHARACTERS = {" ", "\n", "\t"}
 PUNCTUATION_CHARACTERS = {";", ",", "[", "]"}
 
 
+FILES_INCLUDED: list[str] = []
+
+
 def lex(source: str, file_name: str) -> list[Token]:
+    FILES_INCLUDED.append(file_name)
+
     pos = 0
     line_count, line_start = 0, 0
 
@@ -141,6 +146,18 @@ def lex(source: str, file_name: str) -> list[Token]:
         elif char == "\"":
             pos, lexeme = lex_string(source, pos, loc)
             tokens.append(Token(TokenType.STRING, lexeme, loc))
+
+        elif char == "$":
+            # Preprocessor macro starts
+            pos = pos + 1
+            pos, directive = lex_word(source, pos)
+
+            pos, lines_passed, new_start, tks = handle_preprocessor_directive(source, pos, directive, loc)
+            if lines_passed > 0:
+                line_count = line_count + lines_passed
+                line_start = new_start
+
+            tokens.extend(tks)
 
         # Anything that isn't specifically special should be treated as a plain
         # word, unless it matches a keyword from the list
@@ -273,6 +290,30 @@ def lex_word(source: str, start: int) -> tuple[int, str]:
     return pos, source[start:pos]
 
 
+def handle_preprocessor_directive(source: str, start: int, directive: str, loc: Loc) -> tuple[int, int, int, list[Token]]:
+    pos = start
+
+    if directive == "include":
+        pos, seen, new_start = lex_spaces(source, pos)
+        pos, path = lex_string(source, pos, loc.shift(pos - start))
+
+        tokens = []
+
+        # Prevent double includes
+        if path not in FILES_INCLUDED:
+            with open(path, "r") as f:
+                include_src = f.read()
+            tokens = lex(include_src, path)
+
+            # Get rid of the extra EoF
+            _ = tokens.pop()
+
+        return pos, seen, new_start, tokens
+
+    else:
+        print(f"{loc} Error: Unrecognised directive '{directive}'.")
+        exit(1)
+
 # ---------------------------------------------------------------------------------------------------------------------
 # Parser Implementation
 #
@@ -374,8 +415,13 @@ def get_function_label(name: str, loc: Loc) -> str:
     return label
 
 
-def define_function(name: str) -> str:
+def define_function(name: str, loc: Loc) -> str:
     if name in FUNCTION_MAP:
+        # Is the name already defined?
+        if name not in AWAITING_DEF:
+            print(f"{loc} Error: Word '{name}' has already been defined.")
+            exit(1)
+
         label = FUNCTION_MAP[name]
     else:
         label = make_label()
@@ -427,7 +473,7 @@ def parse_def(tokens: list[Token], start: int) -> tuple[int, list[Instr]]:
     pos = expect_keyword("def", tokens, pos)
 
     pos, name = expect_word(tokens, pos)
-    label = define_function(name)
+    label = define_function(name, tokens[pos - 1].loc)
     instrs.append(Instr(InstrType.LABEL, label))
 
     pos = expect_keyword("is", tokens, pos)
@@ -608,10 +654,12 @@ def make_label() -> str:
 #
 
 def interpret(instructions: list[Instr]) -> None:
+    dump_ir(instructions)
+
     ip, heap = 0, bytearray(1024 * 1024)
     val_stack, ret_stack = [], []
 
-    files: dict[int, IO] = { 0: stdin, 1: stdout, 2: stderr }
+    files: dict[int, int] = { 0: 0 , 1: 1, 2: 2 }
     next_file = 3
 
     # Add all the strings to the heap
@@ -774,31 +822,31 @@ def interpret(instructions: list[Instr]) -> None:
             # Read
             if call == 0:
                 fd, buf, l = args
-                data = files[fd].read(l)
-                heap[buf:buf+l] = data.encode("utf-8")
+                data = os.read(files[fd], l)
+                heap[buf:buf+l] = data
                 val_stack.append(len(data))
 
             # Write
             elif call == 1:
                 fd, buf, l = args
-                data = heap[buf:buf+l].decode("utf-8")
-                wrote = files[fd].write(data)
+                data = heap[buf:buf+l]
+                wrote = os.write(files[fd], data)
                 val_stack.append(wrote)
 
             # Open
             elif call == 2:
                 # TODO: Actually make flags and mode do something
                 ptr, flags, mode = args
-                name = heap[ptr:heap.find(0, ptr)].decode("utf-8")
-                file = open(name, "w")
-                files[next_file] = file
+                name = heap[ptr:heap.find(0, ptr)]
+                fd = os.open(name, os.O_RDWR)
+                files[next_file] = fd
                 val_stack.append(next_file)
                 next_file = next_file + 1
 
             # Close
             elif call == 3:
                 fd, = args
-                files[fd].close()
+                os.close(files[fd])
                 # TODO: Don't just fake successful close
                 val_stack.append(0)
 
@@ -1211,7 +1259,7 @@ def dump_ir(instructions: list[Instr]) -> None:
             print(f"{instr.operand}:")
             continue
 
-        print(f"  [{i:04}]    {instr.opcode.name:8}{instr.operand if instr.operand is not None else ''}")
+        print(f"  [{i:04}]    {instr.opcode.name:9}{instr.operand if instr.operand is not None else ''}")
 
 
 # ---------------------------------------------------------------------------------------------------------------------
