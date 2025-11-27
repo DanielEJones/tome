@@ -1,0 +1,11 @@
+$include "lib.tome"
+
+def ask-user is
+    print get-input;
+
+def greet-user is
+    "Hello, " print print "!" println;
+
+def main is
+    "What's your name? " ask-user
+    greet-user;
