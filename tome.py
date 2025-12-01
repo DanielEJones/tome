@@ -1035,6 +1035,31 @@ class Linux_x86_64(Backend):
                 f"    push    rax",
             ])
 
+        elif opcode is InstrType.RESERVE:
+            assert isinstance(operand, int), "The Operand of Reserve must be an integer"
+            Backend._emit_all(file, [
+                f"; reserve {operand}",
+                *([
+                    f"    pop     rax",
+                    f"    mov     qword [r15], rax",
+                    f"    add     r15, 8",
+                ] for _ in range(operand))
+            ])
+
+        elif opcode is InstrType.RELEASE:
+            assert isinstance(operand, int), "The Operand of Release must be an integer"
+            Backend._emit_all(file, [
+                f"; release {operand}",
+                f"    sub     r15, 8",
+            ])
+
+        elif opcode is InstrType.GET_NTH:
+            assert isinstance(operand, int), "The Operand of GetNth must be an integer"
+            Backend._emit_all(file, [
+                f"; get local {operand}",
+                f"    mov     rax, [r15-{8 * operand}]",
+            ])
+
         elif opcode is InstrType.BASEP:
             Backend._emit_all(file, [
                 f"; base-pointer",
