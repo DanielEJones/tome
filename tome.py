@@ -1060,6 +1060,7 @@ class Linux_x86_64(Backend):
             Backend._emit_all(file, [
                 f"; get local {operand}",
                 f"    mov     rax, [r15-{8 * operand}]",
+                f"    push    rax",
             ])
 
         elif opcode is InstrType.BASEP:
