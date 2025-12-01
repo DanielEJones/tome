@@ -1,5 +1,17 @@
-data my-char 1;
+data message 11 ;
 
 def main is
-    if my-char read-ch 0 = then 1 .
-                           else 0 . ;;
+    "Hello, World" -> str do
+
+    0 while dup 11 < do
+        dup -> i do
+            str i + read-ch
+            message i + write-ch ;
+        1 + ;
+
+    0 while dup 11 < do
+        dup message + read-ch .
+        1 + ;
+
+    drop ;;
+

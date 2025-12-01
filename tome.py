@@ -758,7 +758,6 @@ def make_label() -> str:
 #
 
 def interpret(instructions: list[Instr]) -> None:
-    dump_ir(instructions)
 
     ip, heap = 0, bytearray(1024 * 1024)
     val_stack, ret_stack = [], []
@@ -1040,20 +1039,22 @@ class Linux_x86_64(Backend):
     @staticmethod
     def begin(file: IO) -> None:
         Backend._emit_all(file, [
-            "section .bss",
-            "stack_base:",
-            "    resb 1024",
-            "heap_base:",
-            "    resb 1024*1024",
+            f"section .bss",
+            f"data_base:",
+            f"    resb {DATA_SIZE}",
+            f"stack_base:",
+            f"    resb 1024",
+            f"heap_base:",
+            f"    resb 1024*1024",
 
-            "section .rodata",
-            "str_table:",
+            f"section .rodata",
+            f"str_table:",
             *(f"    db {','.join(f'0x{b:02X}' for b in s.encode('utf-8'))}" for s in STRINGS),
 
-            "section .text",
-            "global _start",
-            "_start:",
-            "    mov r15, stack_base",
+            f"section .text",
+            f"global _start",
+            f"_start:",
+            f"    mov r15, stack_base",
         ])
 
     @staticmethod
@@ -1091,7 +1092,7 @@ class Linux_x86_64(Backend):
     def emit_instruction(file: IO, instruction: Instr) -> None:
         opcode, operand = instruction.opcode, instruction.operand
 
-        assert len(InstrType) == 35, "make sure to account for all instruction types"
+        assert len(InstrType) == 36, "make sure to account for all instruction types"
 
         if opcode is InstrType.PUSH:
             Backend._emit_all(file, [
@@ -1103,6 +1104,13 @@ class Linux_x86_64(Backend):
             Backend._emit_all(file, [
                 f"; str {operand}",
                 f"    lea     rax, [rel str_table+{operand}]",
+                f"    push    rax",
+            ])
+
+        elif opcode is InstrType.PUSH_DAT:
+            Backend._emit_all(file, [
+                f"; data {operand}",
+                f"    lea     rax, [rel data_base+{operand}]",
                 f"    push    rax",
             ])
 
