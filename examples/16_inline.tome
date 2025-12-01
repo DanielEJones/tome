@@ -1,0 +1,7 @@
+inline WRITE is 1 ;
+inline STDOUT is 1 ;
+
+inline print is -> len, str do
+    len str STDOUT WRITE syscall3 drop ;;
+
+def main is "Hello, World!\n" print ;
