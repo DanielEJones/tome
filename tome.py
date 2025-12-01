@@ -89,7 +89,7 @@ class Token:
     loc: Loc
 
 
-KEY_WORDS = {"def", "is", "if", "then", "else-if", "else", "do", "while"}
+KEY_WORDS = {"def", "is", "if", "then", "else-if", "else", "do", "while", "->"}
 SPACE_CHARACTERS = {" ", "\n", "\t"}
 PUNCTUATION_CHARACTERS = {";", ",", "[", "]"}
 
@@ -314,6 +314,7 @@ def handle_preprocessor_directive(source: str, start: int, directive: str, loc: 
         print(f"{loc} Error: Unrecognised directive '{directive}'.")
         exit(1)
 
+
 # ---------------------------------------------------------------------------------------------------------------------
 # Parser Implementation
 #
@@ -321,6 +322,9 @@ def handle_preprocessor_directive(source: str, start: int, directive: str, loc: 
 class InstrType(IntEnum):
     PUSH_STR = auto()
     SYSCALL = auto()
+    RESERVE = auto()
+    GET_NTH = auto()
+    RELEASE = auto()
     SDUMP = auto()
     WRITE = auto()
     READ = auto()
@@ -394,6 +398,7 @@ BUILTINS = {
 
 
 STRINGS: list[str] = []
+LOCALS: list[str] = []
 
 # We use these to track functions, as well as manage any instances of
 # use-before-declaration to ensure we don't call an undefined function
@@ -489,6 +494,7 @@ def parse_def(tokens: list[Token], start: int) -> tuple[int, list[Instr]]:
 def parse_expression(tokens: list[Token], start: int) -> tuple[int, list[Instr]]:
     pos, instrs = start, []
 
+    global LOCALS
     assert len(TokenType) == 6, "Make sure all token types are handled as necessary."
 
     while pos < len(tokens):
@@ -501,9 +507,41 @@ def parse_expression(tokens: list[Token], start: int) -> tuple[int, list[Instr]]
 
         # Non builtin words can be handled by a call instruction
         elif token.typ is TokenType.WORD:
-            label = get_function_label(token.lexeme, token.loc)
-            instrs.append(Instr(InstrType.CALL, label))
+            word = token.lexeme
+            if word in LOCALS:
+                instrs.append(Instr(InstrType.GET_NTH, LOCALS.index(word) + 1))
+            else:
+                label = get_function_label(word, token.loc)
+                instrs.append(Instr(InstrType.CALL, label))
             pos = pos + 1
+
+        # LOCAL ::= '->' <word> (',' <word>)* 'do' <exp> ';'
+        elif token.typ is TokenType.KEY_WORD and token.lexeme == "->":
+
+            # Parse the one mandatory name
+            pos = expect_keyword("->", tokens, pos)
+            pos, name = expect_word(tokens, pos)
+
+            # Parse the rest of the names listed
+            names = [name]
+            while pos < len(tokens) and tokens[pos].lexeme == ",":
+                pos, name = expect_word(tokens, pos + 1)
+                names.append(name)
+
+            # Reserve one slot on the stack for each name
+            new_locals_count = len(names)
+            instrs.append(Instr(InstrType.RESERVE, new_locals_count))
+            LOCALS = [*names, *LOCALS]
+
+            # Parse the rest of the body and add in its instructions
+            pos = expect_keyword("do", tokens, pos)
+            pos, body = parse_expression(tokens, pos)
+            instrs.extend(body)
+
+            # Release the reserved stack space
+            pos = expect_keyword(";", tokens, pos)
+            instrs.append(Instr(InstrType.RELEASE, new_locals_count))
+            LOCALS = LOCALS[new_locals_count:]
 
         # IF ::= 'if' <exp> 'then' <exp> ('else-if' <exp> 'then' <exp>)* ('else' <exp>)? ';'
         elif token.typ is TokenType.KEY_WORD and token.lexeme == "if":
@@ -678,7 +716,7 @@ def interpret(instructions: list[Instr]) -> None:
         if instr.opcode is InstrType.LABEL
     }
 
-    assert len(InstrType) == 32, "Make sure all instructions are handled as necessary."
+    assert len(InstrType) == 35, "Make sure all instructions are handled as necessary."
 
     while ip < len(instructions):
         instr = instructions[ip]
@@ -689,6 +727,23 @@ def interpret(instructions: list[Instr]) -> None:
 
         elif instr.opcode is InstrType.PUSH_STR:
             val_stack.append(instr.operand)
+
+        elif instr.opcode is InstrType.RESERVE:
+            assert isinstance(instr.operand, int), "The Operand of Reserve must be an integer"
+            # Push the top n items from the value stack to the return stack, in reverse order
+            for _ in range(instr.operand):
+                ret_stack.append(val_stack.pop())
+
+        elif instr.opcode is InstrType.RELEASE:
+            assert isinstance(instr.operand, int), "The Operand of Release must be an integer"
+            # Discard the top n items of the return stack
+            for _ in range(instr.operand):
+                _ = ret_stack.pop()
+
+        elif instr.opcode is InstrType.GET_NTH:
+            assert isinstance(instr.operand, int), "The Operand of GetNth must be an integer"
+            # Push the nth item from the top of the return stack to the value stack
+            val_stack.append(ret_stack[-instr.operand])
 
         elif instr.opcode is InstrType.BASEP:
             val_stack.append(strings_end)
@@ -965,7 +1020,7 @@ class Linux_x86_64(Backend):
     def emit_instruction(file: IO, instruction: Instr) -> None:
         opcode, operand = instruction.opcode, instruction.operand
 
-        assert len(InstrType) == 32, "make sure to account for all instruction types"
+        assert len(InstrType) == 35, "make sure to account for all instruction types"
 
         if opcode is InstrType.PUSH:
             Backend._emit_all(file, [
@@ -977,6 +1032,34 @@ class Linux_x86_64(Backend):
             Backend._emit_all(file, [
                 f"; str {operand}",
                 f"    lea     rax, [rel str_table+{operand}]",
+                f"    push    rax",
+            ])
+
+        elif opcode is InstrType.RESERVE:
+            assert isinstance(operand, int), "The Operand of Reserve must be an integer"
+            Backend._emit_all(file, [
+                f"; reserve {operand}",
+            ])
+
+            for _ in range(operand):
+                Backend._emit_all(file, [
+                    f"    pop     rax",
+                    f"    mov     qword [r15], rax",
+                    f"    add     r15, 8",
+                ])
+
+        elif opcode is InstrType.RELEASE:
+            assert isinstance(operand, int), "The Operand of Release must be an integer"
+            Backend._emit_all(file, [
+                f"; release {operand}",
+                f"    sub     r15, {8 * operand}",
+            ])
+
+        elif opcode is InstrType.GET_NTH:
+            assert isinstance(operand, int), "The Operand of GetNth must be an integer"
+            Backend._emit_all(file, [
+                f"; get local {operand}",
+                f"    mov     rax, [r15-{8 * operand}]",
                 f"    push    rax",
             ])
 
