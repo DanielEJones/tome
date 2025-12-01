@@ -1020,7 +1020,7 @@ class Linux_x86_64(Backend):
     def emit_instruction(file: IO, instruction: Instr) -> None:
         opcode, operand = instruction.opcode, instruction.operand
 
-        assert len(InstrType) == 32, "make sure to account for all instruction types"
+        assert len(InstrType) == 35, "make sure to account for all instruction types"
 
         if opcode is InstrType.PUSH:
             Backend._emit_all(file, [
@@ -1039,18 +1039,20 @@ class Linux_x86_64(Backend):
             assert isinstance(operand, int), "The Operand of Reserve must be an integer"
             Backend._emit_all(file, [
                 f"; reserve {operand}",
-                *([
+            ])
+
+            for _ in range(operand):
+                Backend._emit_all(file, [
                     f"    pop     rax",
                     f"    mov     qword [r15], rax",
                     f"    add     r15, 8",
-                ] for _ in range(operand))
-            ])
+                ])
 
         elif opcode is InstrType.RELEASE:
             assert isinstance(operand, int), "The Operand of Release must be an integer"
             Backend._emit_all(file, [
                 f"; release {operand}",
-                f"    sub     r15, 8",
+                f"    sub     r15, {8 * operand}",
             ])
 
         elif opcode is InstrType.GET_NTH:
