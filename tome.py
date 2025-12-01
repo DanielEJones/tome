@@ -61,7 +61,7 @@ def do_interpret(instructions: 'list[Instr]') -> None:
 #
 
 class TokenType(IntEnum):
-    KEY_WORD = auto()
+    KEYWORD = auto()
     NUMBER = auto()
     STRING = auto()
     WORD = auto()
@@ -89,7 +89,7 @@ class Token:
     loc: Loc
 
 
-KEY_WORDS = {"data", "def", "is", "if", "then", "else-if", "else", "do", "while", "->"}
+KEYWORDS = {"data", "inline", "def", "is", "if", "then", "else-if", "else", "do", "while", "->"}
 SPACE_CHARACTERS = {" ", "\n", "\t"}
 PUNCTUATION_CHARACTERS = {";", ",", "[", "]"}
 
@@ -163,7 +163,7 @@ def lex(source: str, file_name: str) -> list[Token]:
         # word, unless it matches a keyword from the list
         else:
             pos, lexeme = lex_word(source, pos)
-            typ = TokenType.KEY_WORD if lexeme in KEY_WORDS else TokenType.WORD
+            typ = TokenType.KEYWORD if lexeme in KEYWORDS else TokenType.WORD
             tokens.append(Token(typ, lexeme, loc))
 
     tokens.append(Token(TokenType.EOF, "EoF", Loc(file_name, line_count, pos - line_start)))
@@ -405,6 +405,8 @@ LOCALS: list[str] = []
 DATA: dict[str, int] = {}
 DATA_SIZE: int = 0
 
+INLINES: dict[str, list[Instr]] = {}
+
 # We use these to track functions, as well as manage any instances of
 # use-before-declaration to ensure we don't call an undefined function
 FUNCTION_MAP: dict[str, str] = {}
@@ -429,10 +431,13 @@ def define_function(name: str, loc: Loc) -> str:
     if name in FUNCTION_MAP:
         # Is the name already defined?
         if name not in AWAITING_DEF:
-            print(f"{loc} Error: Word '{name}' has already been defined.")
+            print(f"{loc} Error: WORD '{name}' has already been defined elsewhere.")
             exit(1)
 
         label = FUNCTION_MAP[name]
+    elif name in INLINES or name in DATA:
+        print(f"{loc} Error: WORD '{name}' has already been defined elsewhere.")
+        exit(1)
     else:
         label = make_label()
         FUNCTION_MAP[name] = label
@@ -463,8 +468,11 @@ def parse(tokens: list[Token]) -> list[Instr]:
         elif token.lexeme == "data":
             pos = parse_data(tokens, pos)
 
+        elif token.lexeme == "inline":
+            pos = parse_inline_def(tokens, pos)
+
         else:
-            print(f"{token.loc} Error: Expected KEYWORD 'def' or KEYWORD 'data' but got {token.typ.name} '{token.lexeme}' instead.")
+            print(f"{token.loc} Error: Expected KEYWORD 'def', 'data' or 'inline' but got {token.typ.name} '{token.lexeme}' instead.")
             exit(1)
 
     if "main" in AWAITING_DEF:
@@ -515,7 +523,7 @@ def parse_data(tokens: list[Token], start: int) -> int:
     pos, size = expect_number(tokens, pos)
     pos = expect_keyword(";", tokens, pos)
 
-    global DATA, DATA_SIZE
+    global AWAITING_DEF, DATA, DATA_SIZE, FUNCTION_MAP, INLINES
 
     if name in AWAITING_DEF:
         locations = AWAITING_DEF[name]
@@ -528,7 +536,7 @@ def parse_data(tokens: list[Token], start: int) -> int:
             print(f"{loc} Note: '{name}' is used here.")
         exit(1)
 
-    if name in DATA or name in FUNCTION_MAP:
+    if name in DATA or name in FUNCTION_MAP or name in INLINES:
         print(f"{tokens[name_index].loc} Error: The name '{name}' is already defined elsewhere.")
         exit(1)
 
@@ -538,10 +546,42 @@ def parse_data(tokens: list[Token], start: int) -> int:
     return pos
 
 
+def parse_inline_def(tokens: list[Token], start: int) -> int:
+    pos = expect_keyword("inline", tokens, start)
+
+    name_index = pos
+    pos, name = expect_word(tokens, pos)
+    pos = expect_keyword("is", tokens, pos)
+
+    pos, body = parse_expression(tokens, pos)
+    pos = expect_keyword(";", tokens, pos)
+
+    global AWAITING_DEF, DATA, FUNCTION_MAP, INLINES
+
+    if name in AWAITING_DEF:
+        locations = AWAITING_DEF[name]
+        if len(locations) == 1:
+            print(f"{locations[0]} Error: Inline definition '{name}' must be declared before use.")
+            exit(1)
+
+        print(f"Error: Inline definition '{name}' must be declared before use.")
+        for loc in locations:
+            print(f"{loc} Note: '{name}' is used here.")
+        exit(1)
+
+    if name in DATA or name in FUNCTION_MAP or name in INLINES:
+        print(f"{tokens[name_index].loc} Error: The name '{name}' is already defined elsewhere.")
+        exit(1)
+
+    INLINES[name] = body
+
+    return pos
+
+
 def parse_expression(tokens: list[Token], start: int) -> tuple[int, list[Instr]]:
     pos, instrs = start, []
 
-    global LOCALS, DATA
+    global BUILTINS, DATA, LOCALS, INLINES
     assert len(TokenType) == 6, "Make sure all token types are handled as necessary."
 
     while pos < len(tokens):
@@ -557,6 +597,11 @@ def parse_expression(tokens: list[Token], start: int) -> tuple[int, list[Instr]]
             instrs.append(Instr(InstrType.GET_NTH, LOCALS.index(token.lexeme) + 1))
             pos = pos + 1
 
+        # Words referring to an inline definition have the body inlined
+        elif token.typ is TokenType.WORD and token.lexeme in INLINES:
+            instrs.extend(INLINES[token.lexeme])
+            pos = pos + 1
+
         # Words referring to the data segment push a pointer to the start of their segment
         elif token.typ is TokenType.WORD and token.lexeme in DATA:
             instrs.append(Instr(InstrType.PUSH_DAT, DATA[token.lexeme]))
@@ -569,7 +614,7 @@ def parse_expression(tokens: list[Token], start: int) -> tuple[int, list[Instr]]
             pos = pos + 1
 
         # LOCAL ::= '->' <word> (',' <word>)* 'do' <exp> ';'
-        elif token.typ is TokenType.KEY_WORD and token.lexeme == "->":
+        elif token.typ is TokenType.KEYWORD and token.lexeme == "->":
 
             # Parse the one mandatory name
             pos = expect_keyword("->", tokens, pos)
@@ -597,7 +642,7 @@ def parse_expression(tokens: list[Token], start: int) -> tuple[int, list[Instr]]
             LOCALS = LOCALS[new_locals_count:]
 
         # IF ::= 'if' <exp> 'then' <exp> ('else-if' <exp> 'then' <exp>)* ('else' <exp>)? ';'
-        elif token.typ is TokenType.KEY_WORD and token.lexeme == "if":
+        elif token.typ is TokenType.KEYWORD and token.lexeme == "if":
 
             # Parse out the condition and add its instructions
             pos = expect_keyword("if", tokens, pos)
@@ -655,7 +700,7 @@ def parse_expression(tokens: list[Token], start: int) -> tuple[int, list[Instr]]
             instrs.append(Instr(InstrType.LABEL, end_label))
 
         # WHILE ::= 'while' <exp> 'do' <exp> ';'
-        elif token.typ is TokenType.KEY_WORD and token.lexeme == "while":
+        elif token.typ is TokenType.KEYWORD and token.lexeme == "while":
 
             # We need to be able to jump back to the condition, so make
             # a label and remember it, so we can jump to it later
