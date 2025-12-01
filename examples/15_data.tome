@@ -1,0 +1,5 @@
+data my-char 1;
+
+def main is
+    if my-char read-ch 0 = then 1 .
+                           else 0 . ;;
