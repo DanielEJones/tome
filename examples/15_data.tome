@@ -1,0 +1,17 @@
+data message 11 ;
+
+def main is
+    "Hello, World" -> str do
+
+    0 while dup 11 < do
+        dup -> i do
+            str i + read-ch
+            message i + write-ch ;
+        1 + ;
+
+    0 while dup 11 < do
+        dup message + read-ch .
+        1 + ;
+
+    drop ;;
+

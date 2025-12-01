@@ -79,7 +79,7 @@ class Loc:
         return Loc(self.file, self.row, self.col + d)
 
     def __repr__(self) -> str:
-        return f"[{self.file} @ {self.row:02d}:{self.col:02d}]"
+        return f"[{self.file} @ {self.row + 1}:{self.col + 1}]"
 
 
 @dataclass
@@ -89,7 +89,7 @@ class Token:
     loc: Loc
 
 
-KEY_WORDS = {"def", "is", "if", "then", "else-if", "else", "do", "while", "->"}
+KEY_WORDS = {"data", "def", "is", "if", "then", "else-if", "else", "do", "while", "->"}
 SPACE_CHARACTERS = {" ", "\n", "\t"}
 PUNCTUATION_CHARACTERS = {";", ",", "[", "]"}
 
@@ -320,6 +320,7 @@ def handle_preprocessor_directive(source: str, start: int, directive: str, loc: 
 #
 
 class InstrType(IntEnum):
+    PUSH_DAT = auto()
     PUSH_STR = auto()
     SYSCALL = auto()
     RESERVE = auto()
@@ -398,7 +399,11 @@ BUILTINS = {
 
 
 STRINGS: list[str] = []
+
 LOCALS: list[str] = []
+
+DATA: dict[str, int] = {}
+DATA_SIZE: int = 0
 
 # We use these to track functions, as well as manage any instances of
 # use-before-declaration to ensure we don't call an undefined function
@@ -449,8 +454,18 @@ def parse(tokens: list[Token]) -> list[Instr]:
     instrs.append(Instr(InstrType.END))
 
     while pos < len(tokens) and tokens[pos].typ is not TokenType.EOF:
-        pos, defn = parse_def(tokens, pos)
-        instrs.extend(defn)
+        token = tokens[pos]
+
+        if token.lexeme == "def":
+            pos, defn = parse_def(tokens, pos)
+            instrs.extend(defn)
+
+        elif token.lexeme == "data":
+            pos = parse_data(tokens, pos)
+
+        else:
+            print(f"{token.loc} Error: Expected KEYWORD 'def' or KEYWORD 'data' but got {token.typ.name} '{token.lexeme}' instead.")
+            exit(1)
 
     if "main" in AWAITING_DEF:
         print("Error: Program does not define an entry point. Please define the word 'main'.")
@@ -491,10 +506,42 @@ def parse_def(tokens: list[Token], start: int) -> tuple[int, list[Instr]]:
     return pos, instrs
 
 
+def parse_data(tokens: list[Token], start: int) -> int:
+    pos = expect_keyword("data", tokens, start)
+
+    name_index = pos
+    pos, name = expect_word(tokens, pos)
+
+    pos, size = expect_number(tokens, pos)
+    pos = expect_keyword(";", tokens, pos)
+
+    global DATA, DATA_SIZE
+
+    if name in AWAITING_DEF:
+        locations = AWAITING_DEF[name]
+        if len(locations) == 1:
+            print(f"{locations[0]} Error: Data '{name}' must be declared before use.")
+            exit(1)
+
+        print(f"Error: Data '{name}' must be declared before use.")
+        for loc in locations:
+            print(f"{loc} Note: '{name}' is used here.")
+        exit(1)
+
+    if name in DATA or name in FUNCTION_MAP:
+        print(f"{tokens[name_index].loc} Error: The name '{name}' is already defined elsewhere.")
+        exit(1)
+
+    DATA[name] = DATA_SIZE
+    DATA_SIZE = DATA_SIZE + size
+
+    return pos
+
+
 def parse_expression(tokens: list[Token], start: int) -> tuple[int, list[Instr]]:
     pos, instrs = start, []
 
-    global LOCALS
+    global LOCALS, DATA
     assert len(TokenType) == 6, "Make sure all token types are handled as necessary."
 
     while pos < len(tokens):
@@ -505,14 +552,20 @@ def parse_expression(tokens: list[Token], start: int) -> tuple[int, list[Instr]]
             instrs.append(BUILTINS[token.lexeme])
             pos = pos + 1
 
+        # Words referring to a local push the index of the local onto the stack
+        elif token.typ is TokenType.WORD and token.lexeme in LOCALS:
+            instrs.append(Instr(InstrType.GET_NTH, LOCALS.index(token.lexeme) + 1))
+            pos = pos + 1
+
+        # Words referring to the data segment push a pointer to the start of their segment
+        elif token.typ is TokenType.WORD and token.lexeme in DATA:
+            instrs.append(Instr(InstrType.PUSH_DAT, DATA[token.lexeme]))
+            pos = pos + 1
+
         # Non builtin words can be handled by a call instruction
         elif token.typ is TokenType.WORD:
-            word = token.lexeme
-            if word in LOCALS:
-                instrs.append(Instr(InstrType.GET_NTH, LOCALS.index(word) + 1))
-            else:
-                label = get_function_label(word, token.loc)
-                instrs.append(Instr(InstrType.CALL, label))
+            label = get_function_label(token.lexeme, token.loc)
+            instrs.append(Instr(InstrType.CALL, label))
             pos = pos + 1
 
         # LOCAL ::= '->' <word> (',' <word>)* 'do' <exp> ';'
@@ -652,7 +705,7 @@ def parse_expression(tokens: list[Token], start: int) -> tuple[int, list[Instr]]
 
 def expect_keyword(lexeme: str, tokens: list[Token], index: int) -> int:
     if index >= len(tokens) - 1:
-        print(f"{tokens[-1].loc} Error: Expected '{lexeme}' but got nothing.")
+        print(f"{tokens[-1].loc} Error: Expected '{lexeme}' but got nothing instead.")
         exit(1)
 
     token = tokens[index]
@@ -665,7 +718,7 @@ def expect_keyword(lexeme: str, tokens: list[Token], index: int) -> int:
 
 def expect_word(tokens: list[Token], index: int) -> tuple[int, str]:
     if not index < len(tokens):
-        print(f"{tokens[-1].loc} Error: expected WORD but got nothing.")
+        print(f"{tokens[-1].loc} Error: expected WORD but got nothing instead.")
         exit(1)
 
     token = tokens[index]
@@ -674,6 +727,19 @@ def expect_word(tokens: list[Token], index: int) -> tuple[int, str]:
         exit(1)
 
     return index + 1, token.lexeme
+
+
+def expect_number(tokens: list[Token], index: int) -> tuple[int, int]:
+    if not index < len(tokens):
+        print(f"{tokens[-1].loc} Error: expected NUMBER but got nothing instead.")
+        exit(1)
+
+    token = tokens[index]
+    if token.typ is not TokenType.NUMBER:
+        print(f"{token.loc} Error: Expected NUMBER but got {token.typ.name} '{token.lexeme}' instead.")
+        exit(1)
+
+    return index + 1, int(token.lexeme)
 
 
 LABEL = 0
@@ -692,7 +758,6 @@ def make_label() -> str:
 #
 
 def interpret(instructions: list[Instr]) -> None:
-    dump_ir(instructions)
 
     ip, heap = 0, bytearray(1024 * 1024)
     val_stack, ret_stack = [], []
@@ -706,6 +771,8 @@ def interpret(instructions: list[Instr]) -> None:
         heap[strings_end:strings_end+len(string)] = string.encode('utf-8')
         strings_end = strings_end + len(string)
 
+    data_end = strings_end + DATA_SIZE
+
     # Find all the labels in the program and
     # record their index so that the interpreter
     # can jump to them via this lookup table
@@ -716,7 +783,7 @@ def interpret(instructions: list[Instr]) -> None:
         if instr.opcode is InstrType.LABEL
     }
 
-    assert len(InstrType) == 35, "Make sure all instructions are handled as necessary."
+    assert len(InstrType) == 36, "Make sure all instructions are handled as necessary."
 
     while ip < len(instructions):
         instr = instructions[ip]
@@ -727,6 +794,9 @@ def interpret(instructions: list[Instr]) -> None:
 
         elif instr.opcode is InstrType.PUSH_STR:
             val_stack.append(instr.operand)
+
+        elif instr.opcode is InstrType.PUSH_DAT:
+            val_stack.append(strings_end + instr.operand)
 
         elif instr.opcode is InstrType.RESERVE:
             assert isinstance(instr.operand, int), "The Operand of Reserve must be an integer"
@@ -746,7 +816,7 @@ def interpret(instructions: list[Instr]) -> None:
             val_stack.append(ret_stack[-instr.operand])
 
         elif instr.opcode is InstrType.BASEP:
-            val_stack.append(strings_end)
+            val_stack.append(data_end)
 
         elif instr.opcode is InstrType.WRITE:
             address = val_stack.pop()
@@ -969,20 +1039,22 @@ class Linux_x86_64(Backend):
     @staticmethod
     def begin(file: IO) -> None:
         Backend._emit_all(file, [
-            "section .bss",
-            "stack_base:",
-            "    resb 1024",
-            "heap_base:",
-            "    resb 1024*1024",
+            f"section .bss",
+            f"data_base:",
+            f"    resb {DATA_SIZE}",
+            f"stack_base:",
+            f"    resb 1024",
+            f"heap_base:",
+            f"    resb 1024*1024",
 
-            "section .rodata",
-            "str_table:",
+            f"section .rodata",
+            f"str_table:",
             *(f"    db {','.join(f'0x{b:02X}' for b in s.encode('utf-8'))}" for s in STRINGS),
 
-            "section .text",
-            "global _start",
-            "_start:",
-            "    mov r15, stack_base",
+            f"section .text",
+            f"global _start",
+            f"_start:",
+            f"    mov r15, stack_base",
         ])
 
     @staticmethod
@@ -1020,7 +1092,7 @@ class Linux_x86_64(Backend):
     def emit_instruction(file: IO, instruction: Instr) -> None:
         opcode, operand = instruction.opcode, instruction.operand
 
-        assert len(InstrType) == 35, "make sure to account for all instruction types"
+        assert len(InstrType) == 36, "make sure to account for all instruction types"
 
         if opcode is InstrType.PUSH:
             Backend._emit_all(file, [
@@ -1032,6 +1104,13 @@ class Linux_x86_64(Backend):
             Backend._emit_all(file, [
                 f"; str {operand}",
                 f"    lea     rax, [rel str_table+{operand}]",
+                f"    push    rax",
+            ])
+
+        elif opcode is InstrType.PUSH_DAT:
+            Backend._emit_all(file, [
+                f"; data {operand}",
+                f"    lea     rax, [rel data_base+{operand}]",
                 f"    push    rax",
             ])
 
