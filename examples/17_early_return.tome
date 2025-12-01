@@ -1,0 +1,7 @@
+def abs is -> num do
+    if num 0 < then
+        0 num - return ;
+    num ;;
+
+def main is
+    0 2 - abs . ;

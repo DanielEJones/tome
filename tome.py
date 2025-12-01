@@ -89,7 +89,7 @@ class Token:
     loc: Loc
 
 
-KEYWORDS = {"data", "inline", "def", "is", "if", "then", "else-if", "else", "do", "while", "->"}
+KEYWORDS = {"data", "inline", "def", "is", "if", "then", "else-if", "else", "do", "while", "->", "return"}
 SPACE_CHARACTERS = {" ", "\n", "\t"}
 PUNCTUATION_CHARACTERS = {";", ",", "[", "]"}
 
@@ -398,6 +398,14 @@ BUILTINS = {
 }
 
 
+class Parsing(IntEnum):
+    NULL = auto()
+    WORD = auto()
+    INLINE = auto()
+
+
+CURRENTLY_PARSING = Parsing.NULL
+
 STRINGS: list[str] = []
 
 LOCALS: list[str] = []
@@ -496,6 +504,9 @@ def parse(tokens: list[Token]) -> list[Instr]:
 
 
 def parse_def(tokens: list[Token], start: int) -> tuple[int, list[Instr]]:
+    global CURRENTLY_PARSING
+    CURRENTLY_PARSING = Parsing.WORD
+
     pos, instrs = start, []
 
     pos = expect_keyword("def", tokens, pos)
@@ -547,6 +558,9 @@ def parse_data(tokens: list[Token], start: int) -> int:
 
 
 def parse_inline_def(tokens: list[Token], start: int) -> int:
+    global CURRENTLY_PARSING
+    CURRENTLY_PARSING = Parsing.INLINE
+
     pos = expect_keyword("inline", tokens, start)
 
     name_index = pos
@@ -574,14 +588,13 @@ def parse_inline_def(tokens: list[Token], start: int) -> int:
         exit(1)
 
     INLINES[name] = body
-
     return pos
 
 
 def parse_expression(tokens: list[Token], start: int) -> tuple[int, list[Instr]]:
     pos, instrs = start, []
 
-    global BUILTINS, DATA, LOCALS, INLINES
+    global BUILTINS, DATA, LOCALS, INLINES, CURRENTLY_PARSING
     assert len(TokenType) == 6, "Make sure all token types are handled as necessary."
 
     while pos < len(tokens):
@@ -611,6 +624,16 @@ def parse_expression(tokens: list[Token], start: int) -> tuple[int, list[Instr]]
         elif token.typ is TokenType.WORD:
             label = get_function_label(token.lexeme, token.loc)
             instrs.append(Instr(InstrType.CALL, label))
+            pos = pos + 1
+
+        elif token.typ is TokenType.KEYWORD and token.lexeme == "return":
+            if CURRENTLY_PARSING != Parsing.WORD:
+                print(f"{token.loc} Error: Cannot return from somewhere that is not a word.")
+                exit(1)
+
+            if len(LOCALS) > 0:
+                instrs.append(Instr(InstrType.RELEASE, len(LOCALS)))
+            instrs.append(Instr(InstrType.RET))
             pos = pos + 1
 
         # LOCAL ::= '->' <word> (',' <word>)* 'do' <exp> ';'
@@ -979,9 +1002,7 @@ def interpret(instructions: list[Instr]) -> None:
             print(top)
 
         elif instr.opcode is InstrType.SYSCALL:
-            if not isinstance(instr.operand, int):
-                print("Syscall operand must be an int.")
-                exit(1)
+            assert isinstance(instr.operand, int), "Syscall operand must be an int."
 
             args = []
             for _ in range(1 + instr.operand):
