@@ -830,11 +830,13 @@ def interpret(instructions: list[Instr]) -> None:
     ip, heap = 0, bytearray(1024 * 1024)
     val_stack, ret_stack = [], []
 
+    total_allocated = 0
+
     files: dict[int, int] = { 0: 0 , 1: 1, 2: 2 }
     next_file = 3
 
-    # Add all the strings to the heap
-    strings_end = 0
+    # Add all the strings to the heap. Start at 1 because 0 should be Null
+    strings_end = 1
     for string in STRINGS:
         heap[strings_end:strings_end+len(string)] = string.encode('utf-8')
         strings_end = strings_end + len(string)
@@ -861,7 +863,7 @@ def interpret(instructions: list[Instr]) -> None:
             val_stack.append(instr.operand)
 
         elif instr.opcode is InstrType.PUSH_STR:
-            val_stack.append(instr.operand)
+            val_stack.append(1 + instr.operand)
 
         elif instr.opcode is InstrType.PUSH_DAT:
             val_stack.append(strings_end + instr.operand)
@@ -1040,6 +1042,18 @@ def interpret(instructions: list[Instr]) -> None:
                 os.close(files[fd])
                 # TODO: Don't just fake successful close
                 val_stack.append(0)
+
+            # MMap
+            elif call == 9:
+                addr, l, prot, flags, fd, offset = args
+
+                if fd != -1:
+                    print("Error: Currently cannot mmap actual files.")
+                    exit(1)
+
+                val_stack.append(data_end + total_allocated)
+                total_allocated = total_allocated + l
+                # print(total_allocated)
 
             # Exit
             elif call == 60:

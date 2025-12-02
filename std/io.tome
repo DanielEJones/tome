@@ -1,0 +1,37 @@
+$include "std/memory.tome"
+
+--------------------------------------------------------------------------------------------------------------------
+-- Constants
+--
+inline STDIN  is 0 ;
+inline STDOUT is 1 ;
+
+inline READ  is 0 ;
+inline WRITE is 1 ;
+
+--------------------------------------------------------------------------------------------------------------------
+-- Output
+--
+inline print is STDOUT WRITE syscall3 drop ;
+
+def println is -> len, str do
+
+    -- Allocate a new buffer big enough for the string plus a newline
+    len 1 + allocate -> buf do
+
+    -- Copy the string into the buffer
+    str buf len memcpy
+
+    -- Append the newline
+    '\n' buf len + write-ch
+
+    -- Print the string
+    len 1 + buf print
+
+    -- De-allocate the memory
+    buf free ;;;
+
+---------------------------------------------------------------------------------------------------------------------
+-- Input
+--
+inline get-input is STDIN READ syscall3 1 - ;

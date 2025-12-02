@@ -1,0 +1,15 @@
+$include "std/io.tome"
+
+def main is
+    "What's your name? " ask-user
+    greet-user ;
+
+def ask-user is
+    100 allocate -> buf do
+    print 100 buf get-input
+    buf ;;
+
+def greet-user is
+    -> len, buf do
+    "Hello, " print len buf print "!" println
+    buf free ;;
