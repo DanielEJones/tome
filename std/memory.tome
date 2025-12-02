@@ -1,0 +1,101 @@
+--------------------------------------------------------------------------------------------------------------------
+-- Allocator Implementation
+--
+
+-- Pointer to the start of the free list
+data allocator-free-list 8 ;
+
+-- Header Fields
+inline :is-free is  0 + ;
+inline :size    is  8 + ;
+inline :next    is 16 + ;
+
+inline sizeof(Header) is 24 ;
+
+-- Flag Constants
+inline READ|WRITE    is  3 ;
+inline PRIVATE|ANON  is 34 ;
+inline -1            is 0 1 - ;
+
+inline non-null is 0 = not ;
+
+inline request-memory is -> size do
+    0 -1 PRIVATE|ANON READ|WRITE size sizeof(Header) + 0 9 syscall6 ;;
+
+def find-free-block is -> desired-size do
+    0 allocator-free-list read
+
+    -- Try and find a block with at least enough size from the free list
+    while dup non-null do
+        -> prev, curr do
+
+        if curr :is-free read 1 =
+           curr :size read desired-size < not
+           and
+        then 0 curr :is-free write
+             curr return ;
+
+        curr curr :next read ;;
+
+    -- Capture the last-allocated block
+    drop -> prev do
+
+    -- Failed to find a block, so request the memory from the operating system
+    desired-size request-memory -> block do
+    0               block :is-free  write
+    desired-size    block :size     write
+    0               block :next     write
+
+    -- Add this block to the list so that we can re-use it once freed
+    if prev non-null then block prev :next write
+                     else block allocator-free-list write ;
+
+    block ;;;;
+
+-- To allocate, find a free block and return the start of it's data
+inline allocate is find-free-block sizeof(Header) + ;
+
+def re-allocate is -> size, ptr do
+    ptr sizeof(Header) - -> block do
+
+    -- If the block is large enough to hold the new size, just
+    -- return the original block to them
+    if block :size read size < not then
+        ptr return ;
+
+    -- Mark the original block as free and allocate a new one
+    1 block :is-free write
+    size allocate -> buf do
+
+    -- Copy the original pointer data into the new buffer
+    ptr buf block :size read memcpy
+
+    -- Return the new buffer
+    buf ;;;;
+
+-- To free, move back from the data to find the block and mark freed
+inline free is sizeof(Header) - 1 swap :is-free write ;
+
+
+--------------------------------------------------------------------------------------------------------------------
+-- Memory Utilities
+--
+
+def memcpy is -> src, dst, len do
+    len
+
+    -- Copy 8 bytes at a time while we have 8
+    -- or more bytes left to copy
+    while dup 8 < not do
+        8 -
+        dup src + read
+        2nd dst + write ;
+
+    -- If we have at least one byte left, copy
+    -- one byte at a time until we are finished
+    while dup 1 < not do
+        1 -
+        dup src + read-ch
+        2nd dst + write-ch ;
+
+    drop ;;
