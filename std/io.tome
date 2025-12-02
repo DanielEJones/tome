@@ -15,6 +15,7 @@ inline WRITE is 1 ;
 inline print is STDOUT WRITE syscall3 drop ;
 
 def println is -> len, str do
+
     -- Allocate a new buffer big enough for the string plus a newline
     len 1 + allocate -> buf do
 

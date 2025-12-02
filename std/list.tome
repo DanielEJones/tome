@@ -1,0 +1,57 @@
+$include "std/memory.tome"
+$include "std/io.tome"
+
+
+inline :element-size is  0 + ;
+inline :capacity     is  8 + ;
+inline :count        is 16 + ;
+inline :ptr          is 24 + ;
+inline sizeof(List)  is 32 ;
+
+inline max is -> a, b do
+    if a b < then b else a ;;;
+
+inline init-list is -> ptr, elem-size do
+
+    -- Set all of the list's values
+    elem-size   ptr :element-size write
+    0           ptr :capacity     write
+    0           ptr :count        write
+    0           ptr :ptr          write
+
+    -- Return the pointer to the list
+    ptr ;;
+
+def append is -> list do
+    if list :count read 1 +
+       list :element-size read *
+       list :capacity read >
+    then
+        -- capacity = min(8 els, 2 * capacity)
+        8 list :element-size read *
+        2 list :capacity     read *
+        max dup list :capacity write
+
+        list :ptr read re-allocate
+        list :ptr write ;
+
+    -- elem = list.ptr[list.count]
+    list :ptr read list :count read list :element-size read * + -> elem do
+
+    -- list.count = list.count + 1
+    list :count read 1 +
+    list :count write
+
+    -- return elem
+    elem ;;;
+
+def get is -> list, n do
+    list :ptr read list :element-size read n * + ;;
+
+
+inline new-list is
+    sizeof(List) allocate swap init-list ;
+
+inline delete-list is -> list do
+    list :ptr read free
+    list free ;;

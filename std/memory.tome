@@ -56,6 +56,10 @@ def find-free-block is -> desired-size do
 inline allocate is find-free-block sizeof(Header) + ;
 
 def re-allocate is -> size, ptr do
+    -- If we receive a null pointer, just allocate and return
+    if ptr non-null not then
+        size allocate return ;
+
     ptr sizeof(Header) - -> block do
 
     -- If the block is large enough to hold the new size, just

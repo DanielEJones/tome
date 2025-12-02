@@ -1,0 +1,68 @@
+$include "std/list.tome"
+
+--------------------------------------------------------------------------------------------------------------------
+-- Item Type Definition (discriminated union of int and string)
+--
+
+-- Field accessors, `ptr :field` gets the field and `val ptr :field!` sets the field
+-- Ideally one day we will have a type construct that can generate these automatically
+inline :tag  is     0 + read ;
+inline :tag! is     0 + write ;
+
+inline :len  is     8 + read ;
+inline :len! is     8 + write ;
+
+inline :str  is    16 + read ;
+inline :str! is    16 + write ;
+
+inline :int  is     8 + read ;
+inline :int! is     8 + write ;
+
+-- Because Item is a union, it has the size of the largest variant (in this case, tag + str + len)
+inline sizeof(Item) is 24 ;
+
+-- The two tags that discriminate between the two types of Item
+inline item.INT is 0 ;
+inline item.STR is 1 ;
+
+-- Helper to print the value of an Item
+inline print-item is -> item do
+    if item :tag item.INT = then
+        item :int .
+
+    else-if item :tag item.STR = then
+        item :len item :str println
+
+    else "I don't recognise this tag" println ;;;
+
+
+--------------------------------------------------------------------------------------------------------------------
+-- Main Function
+--
+
+def main is
+    sizeof(Item) new-list -> item-list do
+
+    item-list append -> new-elem do
+        item.INT new-elem :tag!
+        1 new-elem :int! ;
+
+    item-list append -> new-elem do
+        item.STR new-elem :tag!
+        "This is item two" -> len, str do
+            len new-elem :len!
+            str new-elem :str! ;;
+
+    item-list append -> new-elem do
+        item.INT new-elem :tag!
+        3 new-elem :int! ;
+
+    item-list append -> new-elem do
+        item.STR new-elem :tag!
+        "Fourth item!" new-elem :str! new-elem :len! ;
+
+    0 while dup item-list :count read < do
+        item-list 2nd get print-item
+        1 + ;
+
+    item-list delete-list ;;
