@@ -18,7 +18,7 @@ class TestParseFunction(TestCase):
             Token(TokenType.EOF, "", L)]).parse()
 
         self.assertEqual(
-            st.Program([st.WordDef("empty", st.Expression([]))]),
+            st.Program([st.WordDef(L, "empty", st.Expression([]))]),
             tree
         )
 
@@ -32,7 +32,7 @@ class TestParseFunction(TestCase):
             Token(TokenType.EOF, "", L)]).parse()
 
         self.assertEqual(
-            st.Program([st.WordDef("add", st.Expression([st.Word("+")]))]),
+            st.Program([st.WordDef(L, "add", st.Expression([st.Word(L, "+")]))]),
             tree
         )
 
@@ -47,7 +47,7 @@ class TestParseFunction(TestCase):
             Token(TokenType.EOF, "", L)]).parse()
 
         self.assertEqual(
-            st.Program([st.WordDef("square", st.Expression([st.Word("dup"), st.Word("*")]))]),
+            st.Program([st.WordDef(L, "square", st.Expression([st.Word(L, "dup"), st.Word(L, "*")]))]),
             tree
         )
 
@@ -62,7 +62,7 @@ class TestParseFunction(TestCase):
             Token(TokenType.EOF, "", L)]).parse()
 
         self.assertEqual(
-            st.Program([st.WordDef("two-times", st.Expression([st.Int(2), st.Word("*")]))]),
+            st.Program([st.WordDef(L, "two-times", st.Expression([st.Int(L, 2), st.Word(L, "*")]))]),
             tree
         )
 
@@ -77,7 +77,10 @@ class TestIfStatement(TestCase):
             Token(TokenType.PUNCTUATION, ";", L)]).parse_if()
 
         self.assertEqual(
-            st.If(st.Expression([st.Int(1)]), st.Expression([st.Int(1)]), None),
+            st.If(L,
+                cond=st.Expression([st.Int(L, 1)]),
+                body=st.Expression([st.Int(L, 1)]),
+                els=None),
             tree
         )
 
@@ -96,13 +99,13 @@ class TestIfStatement(TestCase):
             Token(TokenType.PUNCTUATION, ";", L)]).parse_if()
 
         self.assertEqual(
-            st.If(
-                cond=st.Expression([st.Int(0)]),
-                body=st.Expression([st.Int(0)]),
-                els=st.Expression([st.If(
-                    cond=st.Expression([st.Int(1)]),
-                    body=st.Expression([st.Int(1)]),
-                    els=st.Expression([st.Int(2)]))])),
+            st.If(L,
+                cond=st.Expression([st.Int(L, 0)]),
+                body=st.Expression([st.Int(L, 0)]),
+                els=st.Expression([st.If(L,
+                    cond=st.Expression([st.Int(L, 1)]),
+                    body=st.Expression([st.Int(L, 1)]),
+                    els=st.Expression([st.Int(L, 2)]))])),
             tree
         )
 
@@ -117,9 +120,9 @@ class TestWhileStatement(TestCase):
             Token(TokenType.PUNCTUATION, ";", L)]).parse_while()
 
         self.assertEqual(
-            st.While(
-                cond=st.Expression([st.Int(1)]),
-                body=st.Expression([st.Int(1)])),
+            st.While(L,
+                cond=st.Expression([st.Int(L, 1)]),
+                body=st.Expression([st.Int(L, 1)])),
             tree
         )
 
@@ -137,8 +140,8 @@ class TestLocalsStatement(TestCase):
             ]).parse_locals()
 
         self.assertEqual(
-            st.Locals(names=["x"], body=st.Expression([
-                st.Word("x"), st.Int(1), st.Word("+")])),
+            st.Locals(L, names=["x"], body=st.Expression([
+                st.Word(L, "x"), st.Int(L, 1), st.Word(L, "+")])),
             tree
         )
 
@@ -159,8 +162,8 @@ class TestLocalsStatement(TestCase):
             Token(TokenType.PUNCTUATION, ";", L)]).parse_locals()
 
         self.assertEqual(
-            st.Locals(names=["x", "y", "z"], body=st.Expression([
-                st.Word("x"), st.Word("y"), st.Word("z"), st.Word("+"), st.Word("+")])),
+            st.Locals(L, names=["x", "y", "z"], body=st.Expression([
+                st.Word(L, "x"), st.Word(L, "y"), st.Word(L, "z"), st.Word(L, "+"), st.Word(L, "+")])),
             tree
         )
 
