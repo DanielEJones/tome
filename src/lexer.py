@@ -14,6 +14,10 @@ class Token:
         lex = "" if not self.lexeme else f" '{self.lexeme}'"
         return f"<{self.loc} {self.typ.name}{lex}>"
 
+    def for_error(self) -> str:
+        lex = "" if not self.lexeme else f" '{self.lexeme}'"
+        return f"{self.typ.name}{lex}"
+
 
 class TokenType(IntEnum):
     WORD = auto()
@@ -21,6 +25,7 @@ class TokenType(IntEnum):
     PUNCTUATION = auto()
     STRING = auto()
     NUMBER = auto()
+    CHAR = auto()
     EOF = auto()
 
 
@@ -47,6 +52,10 @@ class Lexer:
         tokens.append(Token(TokenType.EOF, "", self._loc()))
         return tokens
 
+    def print_errors(self) -> None:
+        for loc, msg in self.errors:
+            print(f"{loc} {msg}")
+
     def _lex_one(self) -> Token | None:
         self._skip_spaces()
         loc = self._loc()
@@ -59,6 +68,9 @@ class Lexer:
 
         if string := self._lex_string():
             return Token(TokenType.STRING, string, loc)
+
+        if char := self._lex_char():
+            return Token(TokenType.CHAR, char, loc)
 
         word = self._lex_word()
         if self.is_keyword(word):
@@ -97,8 +109,38 @@ class Lexer:
             elif current == "\"":
                 return self._source[start:self._pos-1]
 
+            elif current == "\n":
+                self._pos -= 1
+                break
+
         self._error_at(loc, "Unterminated string literal.")
         return None
+
+    def _lex_char(self) -> str | None:
+        loc = self._loc()
+        if not (self._has_more() and self._current() == "\'"):
+            return None
+
+        self._pos += 1
+        start = self._pos
+
+        if not self._has_more():
+            self._error_at(loc, "Unterminated character literal.")
+            return None
+
+        current = self._current()
+        self._pos += 1
+
+        if current == "\\":
+            self._handle_escape()
+
+        if not (self._has_more() and self._current() == "\'"):
+            self._error_at(loc, "Unterminated character literal.")
+            return None
+
+        self._pos += 1
+
+        return self._source[start:self._pos-1]
 
     def _lex_word(self) -> str:
         start = self._pos

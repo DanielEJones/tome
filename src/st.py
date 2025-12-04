@@ -2,13 +2,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from src.lexer import Loc
+
+
+@dataclass
+class Node:
+    location: Loc
+
 
 @dataclass
 class Program:
     definitions: list[Definition]
 
 
-class Definition:
+@dataclass
+class Definition(Node):
     ...
 
 
@@ -23,21 +31,33 @@ class Expression:
     body: list[Literal | Word | Statement]
 
 
-class Literal:
+@dataclass
+class Literal(Node):
     ...
 
 
 @dataclass
-class IntLiteral(Literal):
+class Int(Literal):
     value: int
 
 
 @dataclass
-class Word:
+class Char(Literal):
+    value: str
+
+
+@dataclass
+class String(Literal):
+    value: str
+
+
+@dataclass
+class Word(Node):
     name: str
 
 
-class Statement:
+@dataclass
+class Statement(Node):
     ...
 
 

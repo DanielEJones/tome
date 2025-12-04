@@ -62,7 +62,7 @@ class TestParseFunction(TestCase):
             Token(TokenType.EOF, "", L)]).parse()
 
         self.assertEqual(
-            st.Program([st.WordDef("two-times", st.Expression([st.IntLiteral(2), st.Word("*")]))]),
+            st.Program([st.WordDef("two-times", st.Expression([st.Int(2), st.Word("*")]))]),
             tree
         )
 
@@ -77,7 +77,7 @@ class TestIfStatement(TestCase):
             Token(TokenType.PUNCTUATION, ";", L)]).parse_if()
 
         self.assertEqual(
-            st.If(st.Expression([st.IntLiteral(1)]), st.Expression([st.IntLiteral(1)]), None),
+            st.If(st.Expression([st.Int(1)]), st.Expression([st.Int(1)]), None),
             tree
         )
 
@@ -97,12 +97,12 @@ class TestIfStatement(TestCase):
 
         self.assertEqual(
             st.If(
-                cond=st.Expression([st.IntLiteral(0)]),
-                body=st.Expression([st.IntLiteral(0)]),
+                cond=st.Expression([st.Int(0)]),
+                body=st.Expression([st.Int(0)]),
                 els=st.Expression([st.If(
-                    cond=st.Expression([st.IntLiteral(1)]),
-                    body=st.Expression([st.IntLiteral(1)]),
-                    els=st.Expression([st.IntLiteral(2)]))])),
+                    cond=st.Expression([st.Int(1)]),
+                    body=st.Expression([st.Int(1)]),
+                    els=st.Expression([st.Int(2)]))])),
             tree
         )
 
@@ -118,8 +118,8 @@ class TestWhileStatement(TestCase):
 
         self.assertEqual(
             st.While(
-                cond=st.Expression([st.IntLiteral(1)]),
-                body=st.Expression([st.IntLiteral(1)])),
+                cond=st.Expression([st.Int(1)]),
+                body=st.Expression([st.Int(1)])),
             tree
         )
 
@@ -138,7 +138,7 @@ class TestLocalsStatement(TestCase):
 
         self.assertEqual(
             st.Locals(names=["x"], body=st.Expression([
-                st.Word("x"), st.IntLiteral(1), st.Word("+")])),
+                st.Word("x"), st.Int(1), st.Word("+")])),
             tree
         )
 
