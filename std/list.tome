@@ -2,10 +2,18 @@ $include "std/memory.tome"
 $include "std/io.tome"
 
 
-inline :element-size is  0 + ;
-inline :capacity     is  8 + ;
-inline :count        is 16 + ;
-inline :ptr          is 24 + ;
+inline :list-element-size  is  0 + read ;
+inline :list-element-size! is  0 + write ;
+
+inline :list-capacity      is  8 + read ;
+inline :list-capacity!     is  8 + write ;
+
+inline :list-count         is 16 + read ;
+inline :list-count!        is 16 + write ;
+
+inline :list-ptr           is 24 + read ;
+inline :list-ptr!          is 24 + write ;
+
 inline sizeof(List)  is 32 ;
 
 inline max is -> a, b do
@@ -14,44 +22,42 @@ inline max is -> a, b do
 inline init-list is -> ptr, elem-size do
 
     -- Set all of the list's values
-    elem-size   ptr :element-size write
-    0           ptr :capacity     write
-    0           ptr :count        write
-    0           ptr :ptr          write
+    elem-size   ptr :list-element-size!
+    0           ptr :list-capacity!
+    0           ptr :list-count!
+    0           ptr :list-ptr!
 
     -- Return the pointer to the list
     ptr ;;
 
 def append is -> list do
-    if list :count read 1 +
-       list :element-size read *
-       list :capacity read >
+    if list :list-count 1 +
+       list :list-element-size *
+       list :list-capacity >
     then
         -- capacity = min(8 els, 2 * capacity)
-        8 list :element-size read *
-        2 list :capacity     read *
-        max dup list :capacity write
+        8 list :list-element-size *
+        2 list :list-capacity     *
+        max dup list :list-capacity!
 
-        list :ptr read re-allocate
-        list :ptr write ;
+        list :list-ptr re-allocate
+        list :list-ptr! ;
 
     -- elem = list.ptr[list.count]
-    list :ptr read list :count read list :element-size read * + -> elem do
+    list :list-ptr list :list-count list :list-element-size * + -> elem do
 
     -- list.count = list.count + 1
-    list :count read 1 +
-    list :count write
+    list :list-count 1 + list :list-count!
 
     -- return elem
     elem ;;;
 
-def get is -> list, n do
-    list :ptr read list :element-size read n * + ;;
-
+inline get is -> list, n do
+    list :list-ptr list :list-element-size n * + ;;
 
 inline new-list is
     sizeof(List) allocate swap init-list ;
 
 inline delete-list is -> list do
-    list :ptr read free
+    list :list-ptr free
     list free ;;
