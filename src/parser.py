@@ -85,9 +85,9 @@ class Parser:
 
                 els = st.If(self._tokens[pos].loc, el_cond, el_body, None)
                 add_els_to.els = st.Expression([els])
-                add_els_to = els
 
                 pos = self._mark()
+                add_els_to = els
 
             self._reset(pos)
             if self._expect_keyword("else") and (el_body := self.parse_expression()):

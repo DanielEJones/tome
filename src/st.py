@@ -28,7 +28,7 @@ class WordDef(Definition):
 
 @dataclass
 class Expression:
-    body: list[Literal | Word | Statement]
+    elements: list[Literal | Word | Statement]
 
 
 @dataclass
