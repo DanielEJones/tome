@@ -30,7 +30,7 @@ class TypeStack:
         types_to_unify = zip(reversed(ins), reversed(self.pop(len(ins))))
         for expected, got in types_to_unify:
             if not self.unify(expected, got):
-                raise TypeError(f"Could not unify {self.substitute(expected)} and {self.substitute(got)}.")
+                raise TypeError(f"Could not unify {self.substitute(expected)} and {self.substitute(got)}")
 
         self.push(*outs)
 

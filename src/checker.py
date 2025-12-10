@@ -3,46 +3,78 @@ import src.typs as ty
 import src.st as st
 
 
-def check_expression(expr: st.Expression, env: dict[str, ty.Type], stack: TypeStack) -> None:
-    for element in expr.elements:
-        if isinstance(element, st.Int):
-            stack.push(ty.Int())
+class Checker:
+    def __init__(self, definitions: list[st.Definition]) -> None:
+        self._defs_to_check = definitions
+        self._errors = []
 
-        elif isinstance(element, st.String):
-            stack.push(ty.Str())
+    def check(self, builtin_env: dict[str, ty.Type] | None = None) -> bool:
+        return all(self.check_definition(defn, builtin_env or {}) for defn in self._defs_to_check)
 
-        elif isinstance(element, st.Char):
-            stack.push(ty.Char())
+    def report_errors(self) -> None:
+        for error in reversed(self._errors):
+            print(error)
 
-        elif isinstance(element, st.Word):
-            typ = env[element.name]
-            if isinstance(typ, ty.Word):
-                stack.apply_effect(typ.ins, typ.outs)
-                continue
-            stack.push(typ)
+    def check_definition(self, defn: st.Definition, env: dict[str, ty.Type]) -> bool:
+        if isinstance(defn, st.WordDef):
+            return self.check_word_definition(defn, env)
 
-        elif isinstance(element, st.Statement):
-            check_statement(element, env, stack)
+        else:
+            self._errors.append(f"{defn.location} Unhandled definition type.")
+            return False
 
+    def check_word_definition(self, word: st.WordDef, env: dict[str, ty.Type]) -> bool:
+        stack = TypeStack()
+        if not self.check_expression(word.body, env, stack):
+            self._errors.append(f"{word.location} Failed to type WORD '{word.name}'.")
+            return False
 
-def check_statement(stmt: st.Statement, env: dict[str, ty.Type], stack: TypeStack) -> None:
-    if isinstance(stmt, st.Locals):
-        child_env = env.copy()
+        ins, outs = stack.as_effect()
+        env[word.name] = ty.Word(ins, outs)
+        return True
 
-        for name in reversed(stmt.names):
-            child_env[name] = stack.pop_one()
+    def check_expression(self, expr: st.Expression, env: dict[str, ty.Type], stack: TypeStack) -> bool:
+        for element in expr.elements:
+            if isinstance(element, st.Int):
+                stack.push(ty.Int())
 
-        check_expression(stmt.body, child_env, stack)
+            elif isinstance(element, st.String):
+                stack.push(ty.Str())
 
-    else:
-        print("This is not implemented.")
-        exit(1)
+            elif isinstance(element, st.Char):
+                stack.push(ty.Char())
 
+            elif isinstance(element, st.Word):
+                typ = env[element.name]
+                if isinstance(typ, ty.Word):
+                    try:
+                        stack.apply_effect(typ.ins, typ.outs)
+                        continue
+                    except TypeError as e:
+                        self._errors.append(f"{element.location} {e}.")
+                        return False
 
-def check_word_definition(word: st.WordDef, env: dict[str, ty.Type]) -> None:
-    stack = TypeStack()
-    check_expression(word.body, env, stack)
+                stack.push(typ)
 
-    ins, outs = stack.as_effect()
-    print(ins, outs)
-    env[word.name] = ty.Word(ins, outs)
+            elif isinstance(element, st.Statement):
+                if not self.check_statement(element, env, stack):
+                    return False
+
+        return True
+
+    def check_statement(self, stmt: st.Statement, env: dict[str, ty.Type], stack: TypeStack) -> bool:
+        if isinstance(stmt, st.Locals):
+            child_env = env.copy()
+
+            for name in reversed(stmt.names):
+                child_env[name] = stack.pop_one()
+
+            if not self.check_expression(stmt.body, child_env, stack):
+                self._errors.append(f"{stmt.location} Could not type local binding.")
+                return False
+
+        else:
+            self._errors.append(f"{stmt.location} Unhandled statement type.")
+            return False
+
+        return True
