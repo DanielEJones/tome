@@ -65,7 +65,7 @@ class Statement(Node):
 class If(Statement):
     cond: Expression
     body: Expression
-    els: Expression | None
+    els: Expression
 
 
 @dataclass

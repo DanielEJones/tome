@@ -74,7 +74,7 @@ class Parser:
                 and self._expect_keyword("then")
                 and (body := self.parse_expression())):
 
-            if_stmt = st.If(self._tokens[start].loc, cond, body, None)
+            if_stmt = st.If(self._tokens[start].loc, cond, body, st.Expression([]))
 
             pos = self._mark()
             add_els_to = if_stmt
@@ -83,7 +83,7 @@ class Parser:
                    and self._expect_keyword("then")
                    and (el_body := self.parse_expression())):
 
-                els = st.If(self._tokens[pos].loc, el_cond, el_body, None)
+                els = st.If(self._tokens[pos].loc, el_cond, el_body, st.Expression([]))
                 add_els_to.els = st.Expression([els])
 
                 pos = self._mark()

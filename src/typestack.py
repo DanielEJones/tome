@@ -1,3 +1,4 @@
+from __future__ import annotations
 from src.typs import Type, TVar
 
 
@@ -8,8 +9,29 @@ class TypeStack:
         self._arg_count = 0
         self._var_count = 0
 
+    def clone(self) -> TypeStack:
+        stack = TypeStack()
+        stack._stack = self._stack.copy()
+        stack._subs = self._subs.copy()
+        stack._arg_count = self._arg_count
+        stack._var_count = self._var_count
+        return stack
+
+    def replace_with(self, other: TypeStack) -> None:
+        self._stack = other._stack
+        self._subs = other._subs
+        self._arg_count = other._arg_count
+        self._var_count = other._var_count
+
+    def size(self) -> int:
+        return len(self._stack)
+
     def push(self, *ts: Type) -> None:
         self._stack.extend(ts)
+
+    def inflate_to(self, n: int) -> None:
+        while len(self._stack) < n:
+            self._stack.insert(0, self._fresh_arg())
 
     def pop_one(self) -> Type:
         if len(self._stack) < 1:
@@ -17,8 +39,7 @@ class TypeStack:
         return self._stack.pop()
 
     def pop(self, n: int) -> list[Type]:
-        while len(self._stack) < n:
-            self._stack.insert(0, self._fresh_arg())
+        self.inflate_to(n)
         self._stack, values = split_list_at(len(self._stack) - n, self._stack)
         return values
 
@@ -30,7 +51,7 @@ class TypeStack:
         types_to_unify = zip(reversed(ins), reversed(self.pop(len(ins))))
         for expected, got in types_to_unify:
             if not self.unify(expected, got):
-                raise TypeError(f"Could not unify {self.substitute(expected)} and {self.substitute(got)}")
+                raise TypeError(f"Could not unify types {self.substitute(expected)} and {self.substitute(got)}")
 
         self.push(*outs)
 
@@ -38,6 +59,9 @@ class TypeStack:
         ins = [self.substitute(TVar(f"A{n}")) for n in reversed(range(self._arg_count))]
         outs = [self.substitute(v) for v in self._stack]
         return ins, outs
+
+    def shape(self) -> list[Type]:
+        return [self.substitute(t) for t in self._stack]
 
     def unify(self, a: Type, b: Type) -> bool:
         a = self.substitute(a)
@@ -58,7 +82,8 @@ class TypeStack:
 
     def substitute(self, t: Type) -> Type:
         if isinstance(t, TVar) and (n := t.name) in self._subs:
-            return self.substitute(self._subs[n])
+            sub = self._subs[n]
+            return self.substitute(sub) if sub != t else t
         return t
 
     def _fresh_arg(self) -> TVar:

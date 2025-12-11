@@ -26,7 +26,7 @@ class Checker:
     def check_word_definition(self, word: st.WordDef, env: dict[str, ty.Type]) -> bool:
         stack = TypeStack()
         if not self.check_expression(word.body, env, stack):
-            self._errors.append(f"{word.location} Failed to type WORD '{word.name}'.")
+            self._errors.append(f"{word.location} Failed to typecheck '{word.name}'.")
             return False
 
         ins, outs = stack.as_effect()
@@ -66,12 +66,51 @@ class Checker:
         if isinstance(stmt, st.Locals):
             child_env = env.copy()
 
+            # The names have to come off in reverse order because we
+            # are using pop rather than splitting off n values
             for name in reversed(stmt.names):
                 child_env[name] = stack.pop_one()
 
             if not self.check_expression(stmt.body, child_env, stack):
                 self._errors.append(f"{stmt.location} Could not type local binding.")
                 return False
+
+        if isinstance(stmt, st.If):
+            if not self.check_expression(stmt.cond, env, stack):
+                self._errors.append(f"{stmt.location} Could not type condition.")
+                return False
+
+            # The condition must resolve to a state where the stack has a boolean on top
+            if (cond := stack.pop_one()) != ty.Bool():
+                self._errors.append(f"{stmt.location} Expected condition to produce a boolean value, got {cond} instead.")
+                return False
+
+            # Both branches must type check
+            then_stack = stack.clone()
+            if not self.check_expression(stmt.body, env, then_stack):
+                self._errors.append(f"{stmt.location} Could not type check True branch.")
+                return False
+
+            els_stack = stack.clone()
+            if not self.check_expression(stmt.els, env, els_stack):
+                self._errors.append(f"{stmt.location} Could not type check False branch.")
+                return False
+
+            # If one stack is smaller than the other, it might be that the other has
+            # pulled in arguments from lower in the stack, which is allowed, so we
+            # pre-emptively inflate them to the same size using implicit args
+            if then_stack.size() < els_stack.size():
+                then_stack.inflate_to(els_stack.size())
+            else:
+                els_stack.inflate_to(then_stack.size())
+
+            # If we can unify the two stacks then everything type checks
+            for then, els in zip(reversed(then_stack.shape()), reversed(els_stack.shape())):
+                if not then_stack.unify(then, els):
+                    self._errors.append(f"{stmt.location} Could not unify True and False branches.")
+                    return False
+
+            stack.replace_with(then_stack)
 
         else:
             self._errors.append(f"{stmt.location} Unhandled statement type.")

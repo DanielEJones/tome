@@ -10,6 +10,10 @@ class Int(Type):
     ...
 
 
+class Bool(Type):
+    ...
+
+
 class Str(Type):
     ...
 
