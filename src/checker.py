@@ -75,14 +75,14 @@ class Checker:
                 self._errors.append(f"{stmt.location} Could not type local binding.")
                 return False
 
-        if isinstance(stmt, st.If):
+        elif isinstance(stmt, st.If):
             if not self.check_expression(stmt.cond, env, stack):
                 self._errors.append(f"{stmt.location} Could not type condition.")
                 return False
 
             # The condition must resolve to a state where the stack has a boolean on top
             if (cond := stack.pop_one()) != ty.Bool():
-                self._errors.append(f"{stmt.location} Expected condition to produce a boolean value, got {cond} instead.")
+                self._errors.append(f"{stmt.location} Expected condition to produce a boolean but got {cond} instead.")
                 return False
 
             # Both branches must type check
@@ -96,21 +96,43 @@ class Checker:
                 self._errors.append(f"{stmt.location} Could not type check False branch.")
                 return False
 
-            # If one stack is smaller than the other, it might be that the other has
-            # pulled in arguments from lower in the stack, which is allowed, so we
-            # pre-emptively inflate them to the same size using implicit args
-            if then_stack.size() < els_stack.size():
-                then_stack.inflate_to(els_stack.size())
-            else:
-                els_stack.inflate_to(then_stack.size())
-
-            # If we can unify the two stacks then everything type checks
-            for then, els in zip(reversed(then_stack.shape()), reversed(els_stack.shape())):
-                if not then_stack.unify(then, els):
-                    self._errors.append(f"{stmt.location} Could not unify True and False branches.")
-                    return False
+            # Both branches must have the same shape for the statement to be valid
+            if not then_stack.eq(els_stack):
+                self._errors.append(f"{stmt.location} Could not unify True and False branches.")
+                return False
 
             stack.replace_with(then_stack)
+
+        elif isinstance(stmt, st.While):
+            # The condition and body have to be able to run 0, 1 or N times. This means that to be typed,
+            # the condition and body both have to leave the stack in the same shape they found it, except
+            # the with a boolean value on top in case of the condition
+
+            # Check the condition
+            cond_stack = stack.clone()
+            if not self.check_expression(stmt.cond, env, cond_stack):
+                self._errors.append(f"{stmt.location} Could not type loop condition.")
+                return False
+
+            if (cond := cond_stack.pop_one()) != ty.Bool():
+                self._errors.append(f"{stmt.location} Expected condition to produce a boolean but got {cond} instead.")
+                return False
+
+            if not cond_stack.eq(stack):
+                self._errors.append(f"{stmt.location} Loop condition changes the shape of the stack arbitrarily.")
+                return False
+
+            # Check the body (use a clone of the `cond_stack` to preserve any substitutions made)
+            body_stack = cond_stack.clone()
+            if not self.check_expression(stmt.body, env, body_stack):
+                self._errors.append(f"{stmt.location} Could not type loop body.")
+                return False
+
+            if not body_stack.eq(stack):
+                self._errors.append(f"{stmt.location} Loop body changes the shape of the stack arbitrarily.")
+                return False
+
+            stack.replace_with(body_stack)
 
         else:
             self._errors.append(f"{stmt.location} Unhandled statement type.")

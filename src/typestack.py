@@ -23,6 +23,18 @@ class TypeStack:
         self._arg_count = other._arg_count
         self._var_count = other._var_count
 
+    def eq(self, other: TypeStack) -> bool:
+        # If one stack is smaller than the other, it might be that the other has
+        # pulled in arguments from lower in the stack, which is allowed, so we
+        # pre-emptively inflate them to the same size using implicit args
+        if other.size() < self.size():
+            other.inflate_to(self.size())
+        else:
+            self.inflate_to(other.size())
+
+        # If we can unify each pairwise element of the stacks, then the stacks equal
+        return all(self.unify(a, b) for a, b in zip(reversed(self._stack), reversed(other._stack)))
+
     def size(self) -> int:
         return len(self._stack)
 
