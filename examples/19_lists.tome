@@ -41,27 +41,33 @@ inline print-item is -> item do
 --
 
 def main is
+    -- Make a new list that contains Items
     sizeof(Item) new-list -> item-list do
 
+    -- Append an int (1) to the list
     item-list append -> new-elem do
         item.INT new-elem :tag!
         1 new-elem :int! ;
 
+    -- Append a string to the list
     item-list append -> new-elem do
         item.STR new-elem :tag!
         "This is item two" -> len, str do
             len new-elem :len!
             str new-elem :str! ;;
 
+    -- Append an int to the list
     item-list append -> new-elem do
         item.INT new-elem :tag!
         3 new-elem :int! ;
 
+    -- Append a string to the list
     item-list append -> new-elem do
         item.STR new-elem :tag!
         "Fourth item!" new-elem :str! new-elem :len! ;
 
-    0 while dup item-list :count read < do
+    -- Print all the items
+    0 while dup item-list :list-count < do
         item-list 2nd get print-item
         1 + ;
 
